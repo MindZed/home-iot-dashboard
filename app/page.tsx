@@ -28,7 +28,7 @@ const itemVariants: Variants = {
 };
 
 export default function Home() {
-  const { data, error, logs, clearLogs, toggleRelay } = useIoTData();
+  const { data, error, logs, clearLogs, toggleRelay, pendingRelayIds } = useIoTData();
 
   if (!data) {
     return (
@@ -76,7 +76,7 @@ export default function Home() {
           {/* ── Environment Sensors ─────────────────────────────────── */}
           <motion.section
             variants={itemVariants}
-            className="rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 dark:from-neutral-900 dark:to-red-950 p-5 text-white shadow-lg shadow-blue-200/40 dark:shadow-red-900/20 dark:border dark:border-red-500/20"
+            className="rounded-2xl bg-linear-to-br from-sky-500 to-indigo-600 dark:from-neutral-900 dark:to-red-950 p-5 text-white shadow-lg shadow-blue-200/40 dark:shadow-red-900/20 dark:border dark:border-red-500/20"
             aria-label="Environment sensors"
           >
             <div className="grid grid-cols-2 gap-4">
@@ -145,6 +145,7 @@ export default function Home() {
                 type="plug"
                 hasLoad={data.relays.ct1}
                 onToggle={toggleRelay}
+                isPending={pendingRelayIds.includes(1)}
               />
               <DeviceCard
                 id={2}
@@ -152,6 +153,7 @@ export default function Home() {
                 type="light"
                 hasLoad={data.relays.ct2}
                 onToggle={toggleRelay}
+                isPending={pendingRelayIds.includes(2)}
               />
               <DeviceCard
                 id={3}
@@ -159,6 +161,7 @@ export default function Home() {
                 type="fan"
                 hasLoad={data.relays.ct3}
                 onToggle={toggleRelay}
+                isPending={pendingRelayIds.includes(3)}
               />
               <DeviceCard
                 id={4}
@@ -166,6 +169,7 @@ export default function Home() {
                 type="light"
                 hasLoad={data.relays.ct4}
                 onToggle={toggleRelay}
+                isPending={pendingRelayIds.includes(4)}
               />
             </div>
           </motion.section>

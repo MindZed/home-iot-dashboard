@@ -110,6 +110,7 @@ export function useIoTData() {
   const [data, setData] = useState<IoTPayload | null>(null);
   const [error, setError] = useState<boolean>(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [pendingRelayIds, setPendingRelayIds] = useState<number[]>([]);
 
   // Persistent mock state so 1s polling doesn't reset toggled values during dev
   const mockDataRef = useRef<IoTPayload>(structuredClone(initialMockData));
@@ -131,8 +132,10 @@ export function useIoTData() {
           const key = `ct${i}` as keyof RelayData;
           if (!prevDataRef.current.relays[key] && newData.relays[key]) {
             newLogs.push({ time: now, message: `Device ${i} turned ON`, type: "info" });
+            setPendingRelayIds((current) => current.filter((relayId) => relayId !== i));
           } else if (prevDataRef.current.relays[key] && !newData.relays[key]) {
             newLogs.push({ time: now, message: `Device ${i} turned OFF`, type: "info" });
+            setPendingRelayIds((current) => current.filter((relayId) => relayId !== i));
           }
         }
 
@@ -171,6 +174,8 @@ export function useIoTData() {
   // Does NOT optimistically update UI — the next poll will pick up
   // the new CT sensor state once the physical load changes.
   const toggleRelay = useCallback(async (id: number) => {
+    setPendingRelayIds((current) => (current.includes(id) ? current : [...current, id]));
+
     try {
       await fetch(`/api/iot/relay?id=${id}`, {
         method: "GET",
@@ -194,5 +199,5 @@ export function useIoTData() {
 
   const clearLogs = useCallback(() => setLogs([]), []);
 
-  return { data, error, logs, clearLogs, toggleRelay };
+  return { data, error, logs, clearLogs, toggleRelay, pendingRelayIds };
 }
