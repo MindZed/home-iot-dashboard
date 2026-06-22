@@ -1,5 +1,9 @@
 // hooks/useIoTData.ts
-// Custom hook for polling ESP32 sensor data and toggling relays via n8n webhook.
+// Custom hook for polling ESP32 sensor data and toggling relays.
+//
+// Network flow:
+//   Browser → Cloudflare HTTPS → Cloudflared Tunnel → Home Server (Reverse Proxy) → ESP32 :80
+//
 // CRITICAL: The UI state of devices is driven by CT sensor readings, NOT relay state.
 // In a 2-way switching setup, the relay position doesn't indicate load — only the CT does.
 
@@ -47,13 +51,30 @@ export interface IoTPayload {
 
 // ── Configuration ───────────────────────────────────────────────────────────
 
-// ESP32 endpoint for polling sensor data
-const ESP32_IP = "http://192.168.1.XXX";
+// ESP32 base URL via Cloudflare Tunnel (set in .env.local)
+// e.g. https://esp32.yourdomain.com
+// Falls back to empty string so the app doesn't crash if unset (mock mode kicks in)
+const ESP32_URL = process.env.NEXT_PUBLIC_ESP32_URL || "http://localhost:3000";
 
-// n8n webhook endpoint for toggling relays
-const N8N_WEBHOOK_URL = "https://your-n8n-instance.com/webhook/toggle-relay";
+// Optional: Auth token for the reverse proxy, if it requires verification.
+// The dashboard's own JWT is httpOnly (JS can't read it), so a separate
+// token is needed for cross-origin ESP32 requests through the tunnel.
+// Set NEXT_PUBLIC_ESP32_AUTH_TOKEN in .env.local if your proxy needs it.
+const ESP32_AUTH_TOKEN = process.env.NEXT_PUBLIC_ESP32_AUTH_TOKEN || "";
 
-// ── Mock Data (used when hardware is offline) ───────────────────────────────
+/**
+ * Build common fetch headers for ESP32 requests.
+ * Includes Authorization bearer token if configured.
+ */
+function getEspHeaders(): HeadersInit {
+  const headers: HeadersInit = {};
+  if (ESP32_AUTH_TOKEN) {
+    headers["Authorization"] = `Bearer ${ESP32_AUTH_TOKEN}`;
+  }
+  return headers;
+}
+
+// ── Mock Data (used when hardware/tunnel is offline) ────────────────────────
 
 const initialMockData: IoTPayload = {
   env: {
@@ -95,35 +116,36 @@ export function useIoTData() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch(`${ESP32_IP}/api/data`);
-        if (!res.ok) throw new Error("Network response was not ok");
+        const res = await fetch(`${ESP32_URL}/api/data`, {
+          headers: getEspHeaders(),
+        });
+        if (!res.ok) throw new Error(`ESP32 responded ${res.status}`);
         const json: IoTPayload = await res.json();
         setData(json);
         setError(false);
       } catch {
         setError(true);
-        // Serve mock data for UI development without hardware
+        // Tunnel offline or ESP32 unreachable — serve mock data so the UI stays alive
         setData({ ...mockDataRef.current });
       }
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 1000);
+    const interval = setInterval(fetchData, 100000);
     return () => clearInterval(interval);
   }, []);
 
-  // Fires an n8n webhook to toggle the relay.
-  // Does NOT optimistically update UI — the next poll will pick up
+  // Sends a toggle command to the ESP32 via Cloudflare Tunnel.
+  // Does NOT optimistically update UI — the next 1s poll will pick up
   // the new CT sensor state once the physical load changes.
   const toggleRelay = useCallback(async (id: number) => {
     try {
-      await fetch(N8N_WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ relayId: id }),
+      await fetch(`${ESP32_URL}/api/relay?id=${id}`, {
+        method: "GET",
+        headers: getEspHeaders(),
       });
     } catch {
-      console.warn(`[IoT] Webhook unreachable — mocking toggle for relay ${id}`);
+      console.warn(`[IoT] Tunnel unreachable — mocking toggle for relay ${id}`);
 
       // In dev/mock mode, simulate the CT sensor detecting the load change
       const ctKey = `ct${id}` as keyof RelayData;
