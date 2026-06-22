@@ -7,16 +7,35 @@
 import DeviceCard from "@/components/DeviceCard";
 import BottomNav from "@/components/BottomNav";
 import { useIoTData } from "../hooks/useIoTData";
+import { motion, Variants } from "framer-motion";
+
+import SystemHealth from "@/components/SystemHealth";
+import EventLog from "@/components/EventLog";
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+};
 
 export default function Home() {
-  const { data, error, toggleRelay } = useIoTData();
+  const { data, error, logs, clearLogs, toggleRelay } = useIoTData();
 
   if (!data) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
+      <div className="flex items-center justify-center h-screen bg-gray-50 dark:bg-neutral-950 transition-colors duration-300">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-gray-500 font-medium">
+          <div className="w-8 h-8 border-3 border-blue-500 dark:border-red-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-gray-500 dark:text-neutral-400 font-medium">
             Connecting to hardware…
           </span>
         </div>
@@ -25,33 +44,39 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 font-sans">
+    <div className="flex flex-col h-screen bg-gray-50 dark:bg-neutral-950 font-sans transition-colors duration-300">
       <main className="flex-1 overflow-y-auto p-5 pb-24">
-        <div className="max-w-md mx-auto space-y-5">
+        <motion.div 
+          className="max-w-md mx-auto space-y-5"
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+        >
           {/* ── Header ──────────────────────────────────────────────── */}
-          <header className="pt-3 pb-1">
+          <motion.header variants={itemVariants} className="pt-3 pb-1">
             <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">My Room</h1>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Room</h1>
                 <p
                   className={`mt-0.5 text-sm font-medium transition-colors ${
-                    data.pir.motion ? "text-amber-600" : "text-gray-400"
+                    data.pir.motion ? "text-amber-600 dark:text-amber-500" : "text-gray-400 dark:text-neutral-500"
                   }`}
                 >
                   {data.pir.motion ? "🚶 Motion Detected" : "Room is clear"}
                 </p>
               </div>
               {error && (
-                <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium">
+                <span className="text-xs bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 px-2.5 py-1 rounded-full font-medium">
                   ⚠ Offline
                 </span>
               )}
             </div>
-          </header>
+          </motion.header>
 
           {/* ── Environment Sensors ─────────────────────────────────── */}
-          <section
-            className="rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 p-5 text-white shadow-lg shadow-blue-200/40"
+          <motion.section
+            variants={itemVariants}
+            className="rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 dark:from-neutral-900 dark:to-red-950 p-5 text-white shadow-lg shadow-blue-200/40 dark:shadow-red-900/20 dark:border dark:border-red-500/20"
             aria-label="Environment sensors"
           >
             <div className="grid grid-cols-2 gap-4">
@@ -66,25 +91,26 @@ export default function Home() {
                 value={`${data.env.roomHumidity.toFixed(0)}%`}
               />
               <SensorTile
-                icon="🌀"
-                label="Pressure"
-                value={`${data.env.pressure.toFixed(0)} hPa`}
+                icon="🌡️"
+                label="Box Temp"
+                value={`${data.env.internalTemp.toFixed(1)}°C`}
               />
               <SensorTile
                 icon="🌿"
                 label="Air Quality"
-                value={`${data.env.gasQuality}`}
-                subtitle={getAirQualityLabel(data.env.gasQuality)}
+                value={`${data.env.airQuality}`}
+                subtitle={getAirQualityLabel(data.env.airQuality)}
               />
             </div>
-          </section>
+          </motion.section>
 
           {/* ── Power Monitor ───────────────────────────────────────── */}
-          <section
-            className="rounded-2xl bg-white border border-gray-200/80 p-4 shadow-sm"
+          <motion.section
+            variants={itemVariants}
+            className="rounded-2xl bg-white dark:bg-neutral-900 border border-gray-200/80 dark:border-neutral-800 p-4 shadow-sm transition-colors duration-300"
             aria-label="Power monitor"
           >
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            <h2 className="text-xs font-semibold text-gray-400 dark:text-neutral-500 uppercase tracking-wider mb-3">
               ⚡ Power Monitor
             </h2>
             <div className="grid grid-cols-4 gap-2 text-center">
@@ -105,11 +131,11 @@ export default function Home() {
                 unit="kWh"
               />
             </div>
-          </section>
+          </motion.section>
 
           {/* ── Device Controls ─────────────────────────────────────── */}
-          <section aria-label="Device controls">
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-1">
+          <motion.section variants={itemVariants} aria-label="Device controls">
+            <h2 className="text-xs font-semibold text-gray-400 dark:text-neutral-500 uppercase tracking-wider mb-3 px-1">
               Devices
             </h2>
             <div className="flex flex-col gap-3">
@@ -142,8 +168,19 @@ export default function Home() {
                 onToggle={toggleRelay}
               />
             </div>
-          </section>
-        </div>
+          </motion.section>
+
+          {/* ── System Health ───────────────────────────────────────── */}
+          <motion.div variants={itemVariants}>
+            <SystemHealth sys={data.sys} />
+          </motion.div>
+
+          {/* ── Event Log ───────────────────────────────────────────── */}
+          <motion.div variants={itemVariants}>
+            <EventLog logs={logs} onClear={clearLogs} />
+          </motion.div>
+
+        </motion.div>
       </main>
 
       <BottomNav />
@@ -167,12 +204,12 @@ function SensorTile({
   return (
     <div className="flex flex-col gap-1">
       <span className="text-lg leading-none">{icon}</span>
-      <span className="text-[11px] font-medium text-white/60 uppercase tracking-wide">
+      <span className="text-[11px] font-medium text-white/60 dark:text-neutral-300 uppercase tracking-wide">
         {label}
       </span>
       <span className="text-xl font-bold leading-tight">{value}</span>
       {subtitle && (
-        <span className="text-[11px] font-medium text-white/70">
+        <span className="text-[11px] font-medium text-white/70 dark:text-neutral-400">
           {subtitle}
         </span>
       )}
@@ -183,18 +220,20 @@ function SensorTile({
 function PowerStat({ value, unit }: { value: string; unit: string }) {
   return (
     <div className="flex flex-col items-center">
-      <span className="text-lg font-bold text-gray-800 leading-tight">
+      <span className="text-lg font-bold text-gray-800 dark:text-white leading-tight">
         {value}
       </span>
-      <span className="text-[11px] font-medium text-gray-400">{unit}</span>
+      <span className="text-[11px] font-medium text-gray-400 dark:text-neutral-500">{unit}</span>
     </div>
   );
 }
 
-function getAirQualityLabel(value: number): string {
-  if (value < 50) return "Excellent";
-  if (value < 100) return "Good";
-  if (value < 150) return "Moderate";
-  if (value < 200) return "Poor";
+function getAirQualityLabel(value: number | string): string {
+  const numValue = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(numValue)) return "Unknown";
+  if (numValue < 50) return "Excellent";
+  if (numValue < 100) return "Good";
+  if (numValue < 150) return "Moderate";
+  if (numValue < 200) return "Poor";
   return "Hazardous";
 }

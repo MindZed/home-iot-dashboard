@@ -5,6 +5,8 @@
 
 "use client";
 
+import { motion, Variants } from "framer-motion";
+
 interface DeviceCardProps {
   id: number;
   title: string;
@@ -12,6 +14,11 @@ interface DeviceCardProps {
   hasLoad: boolean; // CT sensor — this IS the source of truth for ON/OFF
   onToggle: (id: number) => void;
 }
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+};
 
 export default function DeviceCard({
   id,
@@ -27,15 +34,18 @@ export default function DeviceCard({
   };
 
   return (
-    <div
+    <motion.div
+      variants={itemVariants}
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.98 }}
       className={`
         relative overflow-hidden rounded-2xl p-5 
         flex items-center justify-between
-        transition-all duration-300
+        transition-colors duration-300
         ${
           hasLoad
-            ? "bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200/60 shadow-md shadow-blue-100/50"
-            : "bg-white border border-gray-200/80 shadow-sm"
+            ? "bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-red-950/40 dark:to-neutral-900 border border-blue-200/60 dark:border-red-500/30 shadow-md shadow-blue-100/50 dark:shadow-red-500/10"
+            : "bg-white dark:bg-neutral-900 border border-gray-200/80 dark:border-neutral-800 shadow-sm"
         }
       `}
     >
@@ -44,11 +54,11 @@ export default function DeviceCard({
         <div
           className={`
             flex items-center justify-center w-12 h-12 text-2xl rounded-xl
-            transition-all duration-300
+            transition-colors duration-300
             ${
               hasLoad
-                ? "bg-blue-500/15 scale-105"
-                : "bg-gray-100"
+                ? "bg-blue-500/15 dark:bg-red-500/20 scale-105"
+                : "bg-gray-100 dark:bg-neutral-800"
             }
           `}
         >
@@ -59,14 +69,14 @@ export default function DeviceCard({
         <div>
           <h3
             className={`font-semibold transition-colors duration-300 ${
-              hasLoad ? "text-gray-900" : "text-gray-500"
+              hasLoad ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-neutral-400"
             }`}
           >
             {title}
           </h3>
           <span
             className={`text-sm font-medium transition-colors duration-300 ${
-              hasLoad ? "text-blue-600" : "text-gray-400"
+              hasLoad ? "text-blue-600 dark:text-red-400" : "text-gray-400 dark:text-neutral-500"
             }`}
           >
             {hasLoad ? "Active" : "Off"}
@@ -81,11 +91,12 @@ export default function DeviceCard({
         className={`
           relative w-14 h-8 flex items-center rounded-full p-1
           transition-colors duration-300 focus:outline-none
-          focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2
-          ${hasLoad ? "bg-blue-500" : "bg-gray-300"}
+          focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-red-400 focus-visible:ring-offset-2
+          ${hasLoad ? "bg-blue-500 dark:bg-red-600" : "bg-gray-300 dark:bg-neutral-700"}
         `}
       >
-        <div
+        <motion.div
+          layout
           className={`
             bg-white w-6 h-6 rounded-full shadow-md
             transform transition-transform duration-300
@@ -93,6 +104,6 @@ export default function DeviceCard({
           `}
         />
       </button>
-    </div>
+    </motion.div>
   );
 }

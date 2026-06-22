@@ -16,8 +16,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 export interface EnvData {
   roomTemp: number;
   roomHumidity: number;
-  pressure: number; // BMP280 atmospheric pressure (hPa)
-  gasQuality: number; // MQ sensor air quality index
+  internalTemp: number; // Box internal temperature
+  airQuality: number | string; // Air quality index or label
 }
 
 export interface PowerData {
@@ -42,11 +42,25 @@ export interface RelayData {
   ct4: boolean;
 }
 
+export interface SysData {
+  ramFree: number;
+  ramTotal: number;
+  cpuFreq: number;
+  uptime: number;
+}
+
 export interface IoTPayload {
   env: EnvData;
   power: PowerData;
   pir: PirData;
   relays: RelayData;
+  sys: SysData;
+}
+
+export interface LogEntry {
+  time: string;
+  message: string;
+  type: "info" | "alert";
 }
 
 // ── Configuration ───────────────────────────────────────────────────────────
@@ -67,11 +81,11 @@ const ESP32_AUTH_TOKEN = process.env.NEXT_PUBLIC_ESP32_AUTH_TOKEN || "";
  * Includes Authorization bearer token if configured.
  */
 function getEspHeaders(): HeadersInit {
-  const headers: HeadersInit = {};
-  if (ESP32_AUTH_TOKEN) {
-    headers["Authorization"] = `Bearer ${ESP32_AUTH_TOKEN}`;
-  }
-  return headers;
+  return {
+    "CF-Access-Client-Id": process.env.NEXT_PUBLIC_CF_CLIENT_ID || "",
+    "CF-Access-Client-Secret": process.env.NEXT_PUBLIC_CF_CLIENT_SECRET || "",
+    "Content-Type": "application/json"
+  };
 }
 
 // ── Mock Data (used when hardware/tunnel is offline) ────────────────────────
@@ -80,8 +94,8 @@ const initialMockData: IoTPayload = {
   env: {
     roomTemp: 24.5,
     roomHumidity: 45.2,
-    pressure: 1013.25,
-    gasQuality: 120,
+    internalTemp: 30.1,
+    airQuality: 120,
   },
   power: {
     voltage: 230.1,
@@ -102,6 +116,12 @@ const initialMockData: IoTPayload = {
     r4: false,
     ct4: false,
   },
+  sys: {
+    ramFree: 128000,
+    ramTotal: 320000,
+    cpuFreq: 240,
+    uptime: 3600,
+  },
 };
 
 // ── Hook ────────────────────────────────────────────────────────────────────
@@ -109,11 +129,45 @@ const initialMockData: IoTPayload = {
 export function useIoTData() {
   const [data, setData] = useState<IoTPayload | null>(null);
   const [error, setError] = useState<boolean>(false);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
 
   // Persistent mock state so 1s polling doesn't reset toggled values during dev
   const mockDataRef = useRef<IoTPayload>(structuredClone(initialMockData));
+  const prevDataRef = useRef<IoTPayload | null>(null);
 
   useEffect(() => {
+    const handleNewData = (newData: IoTPayload) => {
+      if (prevDataRef.current) {
+        const newLogs: LogEntry[] = [];
+        const now = new Date().toLocaleTimeString([], { hour12: false });
+
+        // Check motion
+        if (!prevDataRef.current.pir.motion && newData.pir.motion) {
+          newLogs.push({ time: now, message: "⚠️ Motion Detected", type: "alert" });
+        }
+
+        // Check relays
+        for (let i = 1; i <= 4; i++) {
+          const key = `ct${i}` as keyof RelayData;
+          if (!prevDataRef.current.relays[key] && newData.relays[key]) {
+            newLogs.push({ time: now, message: `Device ${i} turned ON`, type: "info" });
+          } else if (prevDataRef.current.relays[key] && !newData.relays[key]) {
+            newLogs.push({ time: now, message: `Device ${i} turned OFF`, type: "info" });
+          }
+        }
+
+        if (newLogs.length > 0) {
+          setLogs((prev) => {
+            const combined = [...newLogs, ...prev];
+            return combined.slice(0, 15);
+          });
+        }
+      }
+
+      prevDataRef.current = structuredClone(newData);
+      setData(newData);
+    };
+
     const fetchData = async () => {
       try {
         const res = await fetch(`${ESP32_URL}/api/data`, {
@@ -121,22 +175,22 @@ export function useIoTData() {
         });
         if (!res.ok) throw new Error(`ESP32 responded ${res.status}`);
         const json: IoTPayload = await res.json();
-        setData(json);
+        handleNewData(json);
         setError(false);
       } catch {
         setError(true);
         // Tunnel offline or ESP32 unreachable — serve mock data so the UI stays alive
-        setData({ ...mockDataRef.current });
+        handleNewData({ ...mockDataRef.current });
       }
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 100000);
+    const interval = setInterval(fetchData, 2000); // 2 seconds per instructions
     return () => clearInterval(interval);
   }, []);
 
   // Sends a toggle command to the ESP32 via Cloudflare Tunnel.
-  // Does NOT optimistically update UI — the next 1s poll will pick up
+  // Does NOT optimistically update UI — the next poll will pick up
   // the new CT sensor state once the physical load changes.
   const toggleRelay = useCallback(async (id: number) => {
     try {
@@ -156,9 +210,12 @@ export function useIoTData() {
           [ctKey]: !mockDataRef.current.relays[ctKey],
         },
       };
-      setData({ ...mockDataRef.current });
+      // Let the next poll pick up the mock change automatically, 
+      // or we can manually trigger handleNewData if needed.
     }
   }, []);
 
-  return { data, error, toggleRelay };
+  const clearLogs = useCallback(() => setLogs([]), []);
+
+  return { data, error, logs, clearLogs, toggleRelay };
 }

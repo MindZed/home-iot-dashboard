@@ -22,6 +22,8 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
 };
 
+import { ThemeProvider } from "@/context/ThemeProvider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -30,9 +32,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased transition-colors duration-300`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col bg-gray-50 dark:bg-neutral-950 transition-colors duration-300">
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

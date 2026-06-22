@@ -1,4 +1,4 @@
-// middleware.ts
+// proxy.ts
 // Runs on EVERY request at the Edge before any page or API route loads.
 // Checks for a valid JWT in the session cookie. Redirects to /login if missing/invalid.
 
@@ -17,9 +17,11 @@ const SKIP_PREFIXES = [
   "/favicon.ico",
   "/manifest.json",
   "/icon-",      // PWA icons
+  "/sw.js",      // Service worker
+  "/workbox-",   // Workbox scripts
 ];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip static assets and framework internals

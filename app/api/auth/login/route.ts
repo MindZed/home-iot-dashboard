@@ -1,27 +1,39 @@
 // app/api/auth/login/route.ts
 // POST handler for user login.
-// Validates credentials against env vars, sets a signed JWT in an httpOnly cookie.
+// Validates credentials against Neon DB (via Prisma), sets a signed JWT in an httpOnly cookie.
 
 import { NextRequest, NextResponse } from "next/server";
 import { signToken, COOKIE_NAME, SESSION_DURATION } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import bcrypt from "bcryptjs";
 
 export async function POST(request: NextRequest) {
   try {
     const { username, password } = await request.json();
 
-    const validUsername = process.env.AUTH_USERNAME;
-    const validPassword = process.env.AUTH_PASSWORD;
-
-    if (!validUsername || !validPassword) {
-      console.error("[Auth] AUTH_USERNAME or AUTH_PASSWORD not set in .env.local");
+    if (!username || !password) {
       return NextResponse.json(
-        { error: "Server configuration error" },
-        { status: 500 }
+        { error: "Username and password required" },
+        { status: 400 }
       );
     }
 
-    // Constant-time-ish comparison to prevent timing attacks
-    if (username !== validUsername || password !== validPassword) {
+    // Lookup user in DB
+    const user = await prisma.user.findUnique({
+      where: { username },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "Invalid credentials" },
+        { status: 401 }
+      );
+    }
+
+    // Verify password hash
+    const passwordMatch = await bcrypt.compare(password, user.passwordHash);
+
+    if (!passwordMatch) {
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
@@ -41,10 +53,11 @@ export async function POST(request: NextRequest) {
     });
 
     return response;
-  } catch {
+  } catch (error) {
+    console.error("[Login API Error]", error);
     return NextResponse.json(
-      { error: "Invalid request" },
-      { status: 400 }
+      { error: "Invalid request or server error" },
+      { status: 500 }
     );
   }
 }

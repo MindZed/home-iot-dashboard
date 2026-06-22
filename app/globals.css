@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-accent-red: var(--color-red-600);
+  --color-accent-red-hover: var(--color-red-500);
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
