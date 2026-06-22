@@ -65,28 +65,8 @@ export interface LogEntry {
 
 // ── Configuration ───────────────────────────────────────────────────────────
 
-// ESP32 base URL via Cloudflare Tunnel (set in .env.local)
-// e.g. https://esp32.yourdomain.com
-// Falls back to empty string so the app doesn't crash if unset (mock mode kicks in)
-const ESP32_URL = process.env.NEXT_PUBLIC_ESP32_URL || "http://localhost:3000";
-
-// Optional: Auth token for the reverse proxy, if it requires verification.
-// The dashboard's own JWT is httpOnly (JS can't read it), so a separate
-// token is needed for cross-origin ESP32 requests through the tunnel.
-// Set NEXT_PUBLIC_ESP32_AUTH_TOKEN in .env.local if your proxy needs it.
-const ESP32_AUTH_TOKEN = process.env.NEXT_PUBLIC_ESP32_AUTH_TOKEN || "";
-
-/**
- * Build common fetch headers for ESP32 requests.
- * Includes Authorization bearer token if configured.
- */
-function getEspHeaders(): HeadersInit {
-  return {
-    "CF-Access-Client-Id": process.env.NEXT_PUBLIC_CF_CLIENT_ID || "",
-    "CF-Access-Client-Secret": process.env.NEXT_PUBLIC_CF_CLIENT_SECRET || "",
-    "Content-Type": "application/json"
-  };
-}
+// We no longer store the ESP32 URL or Cloudflare Secrets in the client bundle.
+// All requests are now securely proxied through our Next.js API route (/api/iot/[...path]).
 
 // ── Mock Data (used when hardware/tunnel is offline) ────────────────────────
 
@@ -170,9 +150,7 @@ export function useIoTData() {
 
     const fetchData = async () => {
       try {
-        const res = await fetch(`${ESP32_URL}/api/data`, {
-          headers: getEspHeaders(),
-        });
+        const res = await fetch(`/api/iot/data`);
         if (!res.ok) throw new Error(`ESP32 responded ${res.status}`);
         const json: IoTPayload = await res.json();
         handleNewData(json);
@@ -194,9 +172,8 @@ export function useIoTData() {
   // the new CT sensor state once the physical load changes.
   const toggleRelay = useCallback(async (id: number) => {
     try {
-      await fetch(`${ESP32_URL}/api/relay?id=${id}`, {
+      await fetch(`/api/iot/relay?id=${id}`, {
         method: "GET",
-        headers: getEspHeaders(),
       });
     } catch {
       console.warn(`[IoT] Tunnel unreachable — mocking toggle for relay ${id}`);

@@ -93,7 +93,7 @@ export default function Home() {
               <SensorTile
                 icon="🌡️"
                 label="Box Temp"
-                value={`${data.env.internalTemp.toFixed(1)}°C`}
+                value={`${(data.env.internalTemp ?? (data.env as any).pressure ?? 0).toFixed(1)}°C`}
               />
               <SensorTile
                 icon="🌿"
@@ -141,29 +141,29 @@ export default function Home() {
             <div className="flex flex-col gap-3">
               <DeviceCard
                 id={1}
-                title="Main Light"
-                type="light"
+                title="Socket"
+                type="plug"
                 hasLoad={data.relays.ct1}
                 onToggle={toggleRelay}
               />
               <DeviceCard
                 id={2}
-                title="Ceiling Fan"
-                type="fan"
+                title="Main Light"
+                type="light"
                 hasLoad={data.relays.ct2}
                 onToggle={toggleRelay}
               />
               <DeviceCard
                 id={3}
-                title="Desk Lamp"
-                type="light"
+                title="Fan"
+                type="fan"
                 hasLoad={data.relays.ct3}
                 onToggle={toggleRelay}
               />
               <DeviceCard
                 id={4}
-                title="Spare Plug"
-                type="plug"
+                title="Desk Light"
+                type="light"
                 hasLoad={data.relays.ct4}
                 onToggle={toggleRelay}
               />
