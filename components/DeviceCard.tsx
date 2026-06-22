@@ -1,59 +1,97 @@
 // components/DeviceCard.tsx
-// This component represents a single device card in the dashboard. It displays the device's name, type, and current state (on/off).
-// It also includes a toggle switch to change the device's state.
-// The actual API call to control the device will be added later.
+// Renders a single smart device control card.
+// CRITICAL: The visual ON/OFF state is driven entirely by the `hasLoad` prop (CT sensor),
+// NOT by the relay state. In a 2-way switching setup, only current flow tells the truth.
 
 "use client";
 
 interface DeviceCardProps {
   id: number;
   title: string;
-  type: 'light' | 'fan' | 'plug';
-  isOn: boolean;
-  hasLoad: boolean; // From your CT sensors!
+  type: "light" | "fan" | "plug";
+  hasLoad: boolean; // CT sensor — this IS the source of truth for ON/OFF
   onToggle: (id: number) => void;
 }
 
-export default function DeviceCard({ id, title, type, isOn, hasLoad, onToggle }: DeviceCardProps) {
-  
-  // Icon selector based on type
+export default function DeviceCard({
+  id,
+  title,
+  type,
+  hasLoad,
+  onToggle,
+}: DeviceCardProps) {
   const getIcon = () => {
-    if (type === 'light') return '💡';
-    if (type === 'fan') return '🌀';
-    return '🔌';
+    if (type === "light") return "💡";
+    if (type === "fan") return "🌀";
+    return "🔌";
   };
 
   return (
-    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between transition-all hover:shadow-md">
+    <div
+      className={`
+        relative overflow-hidden rounded-2xl p-5 
+        flex items-center justify-between
+        transition-all duration-300
+        ${
+          hasLoad
+            ? "bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200/60 shadow-md shadow-blue-100/50"
+            : "bg-white border border-gray-200/80 shadow-sm"
+        }
+      `}
+    >
       <div className="flex items-center gap-4">
-        
-        {/* Icon container */}
-        <div className={`flex items-center justify-center w-12 h-12 text-2xl rounded-full transition-colors ${isOn ? 'bg-blue-100' : 'bg-gray-100'}`}>
-           {getIcon()}
+        {/* Icon */}
+        <div
+          className={`
+            flex items-center justify-center w-12 h-12 text-2xl rounded-xl
+            transition-all duration-300
+            ${
+              hasLoad
+                ? "bg-blue-500/15 scale-105"
+                : "bg-gray-100"
+            }
+          `}
+        >
+          {getIcon()}
         </div>
-        
-        {/* Title and Hardware Status */}
+
+        {/* Title & Status */}
         <div>
-          <h3 className="font-semibold text-gray-800">{title}</h3>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-sm font-medium text-gray-500">{isOn ? 'ON' : 'OFF'}</span>
-            
-            {/* The CT Sensor Load Indicator */}
-            {isOn && (
-              <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${hasLoad ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                {hasLoad ? '⚡ LOAD' : '⚠️ NO LOAD'}
-              </span>
-            )}
-          </div>
+          <h3
+            className={`font-semibold transition-colors duration-300 ${
+              hasLoad ? "text-gray-900" : "text-gray-500"
+            }`}
+          >
+            {title}
+          </h3>
+          <span
+            className={`text-sm font-medium transition-colors duration-300 ${
+              hasLoad ? "text-blue-600" : "text-gray-400"
+            }`}
+          >
+            {hasLoad ? "Active" : "Off"}
+          </span>
         </div>
       </div>
 
-      {/* Custom Toggle Switch */}
-      <button 
+      {/* Toggle Switch — fires n8n webhook, does NOT optimistically update */}
+      <button
         onClick={() => onToggle(id)}
-        className={`w-14 h-8 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none ${isOn ? 'bg-blue-500' : 'bg-gray-300'}`}
+        aria-label={`Toggle ${title}`}
+        className={`
+          relative w-14 h-8 flex items-center rounded-full p-1
+          transition-colors duration-300 focus:outline-none
+          focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2
+          ${hasLoad ? "bg-blue-500" : "bg-gray-300"}
+        `}
       >
-        <div className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform duration-300 ${isOn ? 'translate-x-6' : 'translate-x-0'}`}></div>
+        <div
+          className={`
+            bg-white w-6 h-6 rounded-full shadow-md
+            transform transition-transform duration-300
+            ${hasLoad ? "translate-x-6" : "translate-x-0"}
+          `}
+        />
       </button>
     </div>
   );

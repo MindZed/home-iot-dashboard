@@ -1,41 +1,108 @@
 // hooks/useIoTData.ts
-// This custom hook fetches data from the ESP32 and provides a toggle function for the relays.
-// It also includes error handling and a fallback to mock data for UI development without the hardware.
+// Custom hook for polling ESP32 sensor data and toggling relays via n8n webhook.
+// CRITICAL: The UI state of devices is driven by CT sensor readings, NOT relay state.
+// In a 2-way switching setup, the relay position doesn't indicate load — only the CT does.
 
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from "react";
 
-// You will change this to your ESP32's actual local IP address later!
-const ESP32_IP = "http://192.168.1.XXX"; 
+// ── Type Definitions ────────────────────────────────────────────────────────
 
-// 1. Move initial mock data outside so we can track it
-const initialMockData = {
-  env: { roomTemp: 24.5, roomHumidity: 45.2, internalTemp: 30.1, airQuality: 120 },
-  power: { voltage: 230.1, current: 1.5, power: 345.0, energy: 12.5 },
-  pir: { motion: false, time: 5000 },
-  relays: { r1: true, ct1: true, r2: false, ct2: false, r3: true, ct3: false, r4: false, ct4: false },
-  sys: { ramFree: 150, ramTotal: 320, cpuFreq: 240, uptime: 120 }
+export interface EnvData {
+  roomTemp: number;
+  roomHumidity: number;
+  pressure: number; // BMP280 atmospheric pressure (hPa)
+  gasQuality: number; // MQ sensor air quality index
+}
+
+export interface PowerData {
+  voltage: number;
+  current: number;
+  power: number; // Watts
+  energy: number; // kWh
+}
+
+export interface PirData {
+  motion: boolean;
+}
+
+export interface RelayData {
+  r1: boolean;
+  ct1: boolean;
+  r2: boolean;
+  ct2: boolean;
+  r3: boolean;
+  ct3: boolean;
+  r4: boolean;
+  ct4: boolean;
+}
+
+export interface IoTPayload {
+  env: EnvData;
+  power: PowerData;
+  pir: PirData;
+  relays: RelayData;
+}
+
+// ── Configuration ───────────────────────────────────────────────────────────
+
+// ESP32 endpoint for polling sensor data
+const ESP32_IP = "http://192.168.1.XXX";
+
+// n8n webhook endpoint for toggling relays
+const N8N_WEBHOOK_URL = "https://your-n8n-instance.com/webhook/toggle-relay";
+
+// ── Mock Data (used when hardware is offline) ───────────────────────────────
+
+const initialMockData: IoTPayload = {
+  env: {
+    roomTemp: 24.5,
+    roomHumidity: 45.2,
+    pressure: 1013.25,
+    gasQuality: 120,
+  },
+  power: {
+    voltage: 230.1,
+    current: 1.5,
+    power: 345.0,
+    energy: 12.5,
+  },
+  pir: {
+    motion: false,
+  },
+  relays: {
+    r1: true,
+    ct1: true,
+    r2: false,
+    ct2: false,
+    r3: true,
+    ct3: false,
+    r4: false,
+    ct4: false,
+  },
 };
 
+// ── Hook ────────────────────────────────────────────────────────────────────
+
 export function useIoTData() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<IoTPayload | null>(null);
   const [error, setError] = useState<boolean>(false);
-  
-  // 2. Use a ref to hold our mock state so the 1s interval doesn't reset your toggles
-  const mockDataRef = useRef(initialMockData);
+
+  // Persistent mock state so 1s polling doesn't reset toggled values during dev
+  const mockDataRef = useRef<IoTPayload>(structuredClone(initialMockData));
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const res = await fetch(`${ESP32_IP}/api/data`);
         if (!res.ok) throw new Error("Network response was not ok");
-        const json = await res.json();
+        const json: IoTPayload = await res.json();
         setData(json);
         setError(false);
-      } catch (err) {
+      } catch {
         setError(true);
-        // 3. Fallback to our up-to-date mock reference instead of hardcoded values
+        // Serve mock data for UI development without hardware
         setData({ ...mockDataRef.current });
       }
     };
@@ -45,27 +112,31 @@ export function useIoTData() {
     return () => clearInterval(interval);
   }, []);
 
-  const toggleRelay = async (id: number) => {
+  // Fires an n8n webhook to toggle the relay.
+  // Does NOT optimistically update UI — the next poll will pick up
+  // the new CT sensor state once the physical load changes.
+  const toggleRelay = useCallback(async (id: number) => {
     try {
-      await fetch(`${ESP32_IP}/api/relay?id=${id}`);
-      // If hardware is real, the next 1s poll catches the updated state automatically
-    } catch (err) {
-      console.log("Hardware offline: Mocking toggle for relay", id);
-      
-      // 4. Update our mock data reference dynamically
-      const relayKey = `r${id}` as keyof typeof mockDataRef.current.relays;
-      const ctKey = `ct${id}` as keyof typeof mockDataRef.current.relays;
-      
-      // Flip the relay state
-      mockDataRef.current.relays[relayKey] = !mockDataRef.current.relays[relayKey];
-      
-      // For UI testing realism, let's also pretend the CT Sensor detected the load change
-      mockDataRef.current.relays[ctKey] = mockDataRef.current.relays[relayKey];
+      await fetch(N8N_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ relayId: id }),
+      });
+    } catch {
+      console.warn(`[IoT] Webhook unreachable — mocking toggle for relay ${id}`);
 
-      // Instantly update the UI so the button toggles smoothly
+      // In dev/mock mode, simulate the CT sensor detecting the load change
+      const ctKey = `ct${id}` as keyof RelayData;
+      mockDataRef.current = {
+        ...mockDataRef.current,
+        relays: {
+          ...mockDataRef.current.relays,
+          [ctKey]: !mockDataRef.current.relays[ctKey],
+        },
+      };
       setData({ ...mockDataRef.current });
     }
-  };
+  }, []);
 
   return { data, error, toggleRelay };
 }
