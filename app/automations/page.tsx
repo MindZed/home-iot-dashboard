@@ -14,7 +14,7 @@ const DEVICES = [
 
 type TimerState = Record<
   number,
-  { durationSeconds: number; remainingSeconds: number; endTime: number }
+  { durationSeconds: number; remainingSeconds: number }
 >;
 
 export default function AutomationsPage() {
@@ -35,14 +35,13 @@ export default function AutomationsPage() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const now = Date.now();
       const expiredIds: number[] = [];
 
       setTimers((current) => {
         const next: TimerState = {};
         for (const [id, timer] of Object.entries(current)) {
           const relayId = Number(id);
-          const remainingSeconds = Math.max(0, Math.ceil((timer.endTime - now) / 1000));
+          const remainingSeconds = Math.max(0, timer.remainingSeconds - 1);
           if (remainingSeconds === 0) {
             expiredIds.push(relayId);
             continue;
@@ -71,10 +70,9 @@ export default function AutomationsPage() {
       void toggleRelay(id);
     }
 
-    const endTime = Date.now() + durationSeconds * 1000;
     setTimers((current) => ({
       ...current,
-      [id]: { durationSeconds, remainingSeconds: durationSeconds, endTime },
+      [id]: { durationSeconds, remainingSeconds: durationSeconds },
     }));
   };
 
