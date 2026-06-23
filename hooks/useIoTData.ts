@@ -220,7 +220,7 @@ function normalizeAirQuality(value: number | string): number | string {
   }
 
   // MQ135 raw analog readings are usually around 200–500; map to AQI-like 50–300.
-  if (parsed >= 180 && parsed <= 550) {
+  if (parsed >= 200 && parsed <= 550) {
     const mapped = ((parsed - 200) / 300) * 250 + 50;
     return Math.round(Math.max(0, Math.min(500, mapped)));
   }
