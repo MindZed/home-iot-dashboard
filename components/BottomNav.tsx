@@ -25,10 +25,17 @@ export default function BottomNav() {
           <span className="text-xs mt-1 font-medium">Home</span>
         </Link>
 
-        <button className="flex flex-col items-center justify-center w-full text-gray-400 hover:text-blue-500 dark:hover:text-red-500 transition-colors">
+        <Link
+          href="/automations"
+          className={`flex flex-col items-center justify-center w-full transition-colors ${
+            pathname === "/automations"
+              ? "text-blue-500 dark:text-red-500"
+              : "text-gray-400 hover:text-blue-500 dark:hover:text-red-500"
+          }`}
+        >
           <span className="text-xl">⚡</span>
           <span className="text-xs mt-1 font-medium">Automations</span>
-        </button>
+        </Link>
 
         <Link
           href="/settings"

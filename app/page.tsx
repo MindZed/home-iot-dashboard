@@ -6,7 +6,7 @@
 
 import DeviceCard from "@/components/DeviceCard";
 import BottomNav from "@/components/BottomNav";
-import { useIoTData } from "../hooks/useIoTData";
+import { useIoTData, type EnvData } from "../hooks/useIoTData";
 import { motion, Variants } from "framer-motion";
 
 import SystemHealth from "@/components/SystemHealth";
@@ -91,9 +91,9 @@ export default function Home() {
                 value={`${data.env.roomHumidity.toFixed(0)}%`}
               />
               <SensorTile
-                icon="🌡️"
-                label="Box Temp"
-                value={`${(data.env.internalTemp ?? (data.env as any).pressure ?? 0).toFixed(1)}°C`}
+                icon="🌬️"
+                label="Pressure"
+                value={`${getPressureValue(data.env).toFixed(1)} hPa`}
               />
               <SensorTile
                 icon="🌿"
@@ -240,4 +240,9 @@ function getAirQualityLabel(value: number | string): string {
   if (numValue < 150) return "Moderate";
   if (numValue < 200) return "Poor";
   return "Hazardous";
+}
+
+function getPressureValue(env: EnvData): number {
+  const value = env.pressure ?? env.internalTemp ?? 0;
+  return Number.isFinite(value) ? value : 0;
 }

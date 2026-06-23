@@ -16,7 +16,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 export interface EnvData {
   roomTemp: number;
   roomHumidity: number;
-  internalTemp: number; // Box internal temperature
+  pressure?: number; // Atmospheric pressure (hPa)
+  internalTemp?: number; // Backward compatibility for older payloads
   airQuality: number | string; // Air quality index or label
 }
 
@@ -74,7 +75,7 @@ const initialMockData: IoTPayload = {
   env: {
     roomTemp: 24.5,
     roomHumidity: 45.2,
-    internalTemp: 30.1,
+    pressure: 1001.6,
     airQuality: 120,
   },
   power: {
@@ -156,12 +157,12 @@ export function useIoTData() {
         const res = await fetch(`/api/iot/data`);
         if (!res.ok) throw new Error(`ESP32 responded ${res.status}`);
         const json: IoTPayload = await res.json();
-        handleNewData(json);
+        handleNewData(normalizeEnvPayload(json));
         setError(false);
       } catch {
         setError(true);
         // Tunnel offline or ESP32 unreachable — serve mock data so the UI stays alive
-        handleNewData({ ...mockDataRef.current });
+        handleNewData(normalizeEnvPayload({ ...mockDataRef.current }));
       }
     };
 
@@ -200,4 +201,29 @@ export function useIoTData() {
   const clearLogs = useCallback(() => setLogs([]), []);
 
   return { data, error, logs, clearLogs, toggleRelay, pendingRelayIds };
+}
+
+function normalizeEnvPayload(payload: IoTPayload): IoTPayload {
+  return {
+    ...payload,
+    env: {
+      ...payload.env,
+      airQuality: normalizeAirQuality(payload.env.airQuality),
+    },
+  };
+}
+
+function normalizeAirQuality(value: number | string): number | string {
+  const parsed = typeof value === "string" ? Number.parseFloat(value) : value;
+  if (Number.isNaN(parsed)) {
+    return value;
+  }
+
+  // MQ135 raw analog readings are usually around 200–500; map to AQI-like 50–300.
+  if (parsed >= 200 && parsed <= 550) {
+    const mapped = ((parsed - 200) / 300) * 250 + 50;
+    return Math.round(Math.max(0, Math.min(500, mapped)));
+  }
+
+  return Math.round(parsed);
 }
