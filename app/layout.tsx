@@ -27,6 +27,7 @@ export const metadata: Metadata = {
 };
 
 import { ThemeProvider } from "@/context/ThemeProvider";
+import { IoTProvider } from "@/context/IoTContext";
 
 export default function RootLayout({
   children,
@@ -41,7 +42,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-gray-50 dark:bg-neutral-950 transition-colors duration-300">
         <ThemeProvider>
-          {children}
+          <IoTProvider>
+            {children}
+          </IoTProvider>
         </ThemeProvider>
       </body>
     </html>
