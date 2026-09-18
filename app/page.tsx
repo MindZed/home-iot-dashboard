@@ -12,6 +12,7 @@ import { motion, Variants } from "framer-motion";
 import SystemHealth from "@/components/SystemHealth";
 import EventLog from "@/components/EventLog";
 import ServerControl from "@/components/ServerControl";
+import QuickScenes from "@/components/QuickScenes";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -29,7 +30,16 @@ const itemVariants: Variants = {
 };
 
 export default function Home() {
-  const { data, error, logs, clearLogs, toggleRelay, pendingRelayIds, wakeServer } = useIoTData();
+  const {
+    data,
+    error,
+    logs,
+    clearLogs,
+    toggleRelay,
+    pendingRelayIds,
+    wakeServer,
+    setRelayTimer,
+  } = useIoTData();
 
   if (!data) {
     return (
@@ -105,16 +115,42 @@ export default function Home() {
             </div>
           </motion.section>
 
+          {/* ── 1-Tap Quick Scenes ──────────────────────────────────── */}
+          <motion.div variants={itemVariants}>
+            <QuickScenes
+              relays={data.relays}
+              onToggle={toggleRelay}
+              pendingRelayIds={pendingRelayIds}
+            />
+          </motion.div>
+
           {/* ── Power Monitor ───────────────────────────────────────── */}
           <motion.section
             variants={itemVariants}
             className="rounded-2xl bg-white dark:bg-neutral-900 border border-gray-200/80 dark:border-neutral-800 p-4 shadow-sm transition-colors duration-300"
             aria-label="Power monitor"
           >
-            <h2 className="text-xs font-semibold text-gray-400 dark:text-neutral-500 uppercase tracking-wider mb-3">
-              ⚡ Power Monitor
-            </h2>
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold text-gray-400 dark:text-neutral-500 uppercase tracking-wider">
+                ⚡ Power Monitor
+              </h2>
+              {/* Power Quality Badge based on PF */}
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${
+                  (data.power.pf ?? 1.0) >= 0.95
+                    ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200/80 dark:border-emerald-800/40"
+                    : (data.power.pf ?? 1.0) >= 0.85
+                    ? "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/40"
+                    : "bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-400 border-orange-200/80 dark:border-orange-800/40"
+                }`}
+                title={`Power Factor: ${(data.power.pf ?? 1.0).toFixed(2)}`}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                {(data.power.pf ?? 1.0).toFixed(2)} PF • {getPfClassification(data.power.pf ?? 1.0)}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2 text-center pb-2.5">
               <PowerStat
                 value={`${data.power.voltage.toFixed(0)}`}
                 unit="V"
@@ -132,6 +168,22 @@ export default function Home() {
                 unit="kWh"
               />
             </div>
+
+            {/* Apparent Power Breakdown */}
+            <div className="pt-2 border-t border-gray-100 dark:border-neutral-800/70 flex items-center justify-between text-[11px] text-gray-400 dark:text-neutral-500 font-medium px-0.5">
+              <span>
+                Apparent:{" "}
+                <strong className="text-gray-700 dark:text-neutral-300">
+                  {Math.round(data.power.voltage * data.power.current)} VA
+                </strong>
+              </span>
+              <span>
+                Grid:{" "}
+                <strong className="text-gray-700 dark:text-neutral-300">
+                  50 Hz • 230V RMS
+                </strong>
+              </span>
+            </div>
           </motion.section>
 
           {/* ── Device Controls ─────────────────────────────────────── */}
@@ -145,7 +197,9 @@ export default function Home() {
                 title="Socket"
                 type="plug"
                 hasLoad={data.relays.ct1}
+                timerSec={data.relays.t1}
                 onToggle={toggleRelay}
+                onSetTimer={setRelayTimer}
                 isPending={pendingRelayIds.includes(1)}
               />
               <DeviceCard
@@ -153,7 +207,9 @@ export default function Home() {
                 title="Main Light"
                 type="light"
                 hasLoad={data.relays.ct2}
+                timerSec={data.relays.t2}
                 onToggle={toggleRelay}
+                onSetTimer={setRelayTimer}
                 isPending={pendingRelayIds.includes(2)}
               />
               <DeviceCard
@@ -161,7 +217,9 @@ export default function Home() {
                 title="Fan"
                 type="fan"
                 hasLoad={data.relays.ct3}
+                timerSec={data.relays.t3}
                 onToggle={toggleRelay}
+                onSetTimer={setRelayTimer}
                 isPending={pendingRelayIds.includes(3)}
               />
               <DeviceCard
@@ -169,7 +227,9 @@ export default function Home() {
                 title="Desk Light"
                 type="light"
                 hasLoad={data.relays.ct4}
+                timerSec={data.relays.t4}
                 onToggle={toggleRelay}
+                onSetTimer={setRelayTimer}
                 isPending={pendingRelayIds.includes(4)}
               />
             </div>
@@ -246,4 +306,10 @@ function getAirQualityLabel(value: number | string): string {
   if (numValue < 150) return "Moderate";
   if (numValue < 200) return "Poor";
   return "Hazardous";
+}
+
+function getPfClassification(pf: number): string {
+  if (pf >= 0.95) return "Clean Resistive";
+  if (pf >= 0.85) return "Normal Load";
+  return "Inductive Motor";
 }

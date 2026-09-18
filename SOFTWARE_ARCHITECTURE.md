@@ -14,14 +14,17 @@ This document contains the architecture, tech stack, and structure for the `home
 
 ## Real-Time MQTT Architecture
 - Direct browser connection to EMQX Serverless (`wss://z1314459.ala.asia-southeast1.emqxsl.com:8084/mqtt`).
-- Completely decouples the dashboard from the local home server and Cloudflare tunnel.
-- Subscribes to `home/node1/telemetry`, `home/node1/status`, `home/node1/heartbeat`, `home/node1/wol/ack`.
+- Completely decouples the dashboard from the local home server and Cloudflare tunnel (100% Vercel compatible).
+- Subscribes to `home/node1/telemetry`, `home/node1/status`, `home/node1/heartbeat`, `home/node1/relay/+/timer_ack`, `home/node1/wol/ack`.
 - Controls relays with sub-40ms latency by publishing directly to `home/node1/relay/{id}/toggle`.
+- On-device Edge Timers: Publishes to `home/node1/relay/{id}/timer` (`{"seconds": 300}`); ESP32 manages countdown internally on edge.
 - Sends Wake-on-LAN packets on demand by publishing to `home/node1/wol/toggle` with live server status feedback.
+- 1-Tap Master Scenes ("Leave Home / All Off", "Work Mode", "Night Mode", "All On").
+- Power Quality Monitoring: Displays real-time Power Factor (PF) load classification and Apparent Power (VA).
 
 ## Directory Structure
 - `app/`: Next.js App Router endpoints and pages.
-- `components/`: Reusable React UI components (`DeviceCard`, `ServerControl`, `SystemHealth`, `EventLog`, `BottomNav`).
+- `components/`: Reusable React UI components (`DeviceCard`, `ServerControl`, `QuickScenes`, `SystemHealth`, `EventLog`, `BottomNav`).
 - `context/`: React context providers for state management.
 - `hooks/`: Custom React hooks.
 - `lib/`: Utility functions and shared core logic.
