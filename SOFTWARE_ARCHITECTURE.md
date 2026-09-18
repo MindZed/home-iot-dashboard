@@ -28,10 +28,17 @@ This document contains the architecture, tech stack, and structure for the `home
 - **DeviceCard**: 2x2 grid layout with sunset-orange gradient active glow (`from-amber-500 via-orange-600 to-rose-600`), CT-driven states, and Lucide vector icons.
 - **TimerModal**: 360° interactive rotary dial supporting two-way auto-off / auto-on timers up to 24 hours.
 - **ClimateDial**: Radial temperature gauge with circular ticks, ambient needle, humidity, pressure, and air quality bar.
-- **BottomNav**: Elevated floating glassmorphism pill bar with Lucide icons (`Home`, `Climate`, `Energy`, `Server`, `Settings`).
+- **BottomNav**: Subtle, textless, floating glassmorphic pill bar (`backdrop-blur-2xl`) with Lucide vector icons (`Home`, `Climate`, `Energy`, `Server`, `Settings`).
+
+## Page Routing Structure
+- `/`: Main dashboard with greeting, quick 3-metric pill, 1-tap scenes, 2x2 device grid, and section shortcuts.
+- `/climate`: Dedicated climate & environment page recreating Screen 2 of the reference design with the radial gauge dial and comfort analytics.
+- `/energy`: Dedicated power monitoring page with real-time active watts, apparent power (VA), power factor quality badge, and circuit load states.
+- `/server`: Dedicated infrastructure page with Wake-on-LAN control, SSH port 22 health ping, ESP32 CPU/RAM diagnostics, and live event console.
+- `/settings`: User credentials, MQTT broker configuration, and offline PWA settings.
 
 ## Directory Structure
-- `app/`: Next.js App Router endpoints and pages.
+- `app/`: Next.js App Router endpoints and pages (`page.tsx`, `climate/`, `energy/`, `server/`, `settings/`, `login/`).
 - `components/`: Reusable React UI components (`DeviceCard`, `ClimateDial`, `TimerModal`, `LoadingScreen`, `ServerControl`, `QuickScenes`, `SystemHealth`, `EventLog`, `BottomNav`).
 - `context/`: React context providers for state management.
 - `hooks/`: Custom React hooks.

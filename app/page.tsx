@@ -1,32 +1,27 @@
 // app/page.tsx
 // Mobile-first Smart Home IoT control center inspired by the reference design (@uix.vikram).
 // Dark obsidian aesthetic, 2x2 grid device controls, rotary two-way edge timer modal,
-// radial climate gauge dial, live power factor monitoring, and floating glassmorphic navigation.
+// quick metric pill with deep-links, and floating glassmorphic navigation.
 
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bell,
-  Sparkles,
   Zap,
   Activity,
   Thermometer,
   Droplets,
-  Gauge,
+  Server,
+  ArrowUpRight,
   CheckCircle2,
-  AlertCircle,
-  Wifi,
 } from "lucide-react";
 
 import { useIoTData } from "../hooks/useIoTData";
 import DeviceCard from "@/components/DeviceCard";
-import ClimateDial from "@/components/ClimateDial";
 import QuickScenes from "@/components/QuickScenes";
-import ServerControl from "@/components/ServerControl";
-import SystemHealth from "@/components/SystemHealth";
-import EventLog from "@/components/EventLog";
 import BottomNav from "@/components/BottomNav";
 import LoadingScreen from "@/components/LoadingScreen";
 
@@ -34,16 +29,12 @@ export default function Home() {
   const {
     data,
     isConnecting,
-    error,
     logs,
-    clearLogs,
     toggleRelay,
     pendingRelayIds,
-    wakeServer,
     setRelayTimer,
   } = useIoTData();
 
-  const [activeNavTab, setActiveNavTab] = useState<string>("home");
   const [showNotificationTray, setShowNotificationTray] = useState<boolean>(false);
 
   // Animated loading screen until WebSocket connection delivers initial telemetry
@@ -51,17 +42,9 @@ export default function Home() {
     return <LoadingScreen statusText="Connecting directly to ESP32 via EMQX Cloud..." />;
   }
 
-  // Safety fallback if data is null
   if (!data) {
     return <LoadingScreen statusText="Syncing device telemetry..." />;
   }
-
-  // Power Quality assessment helper
-  const getPfClassification = (pf: number) => {
-    if (pf >= 0.95) return "Clean Resistive";
-    if (pf >= 0.85) return "Normal Load";
-    return "Inductive Motor";
-  };
 
   const activeDeviceCount = [
     data.relays.ct1,
@@ -146,34 +129,43 @@ export default function Home() {
             </div>
           </header>
 
-          {/* ── Summary Sensor Pill (Screen 1 style) ─────────────────── */}
+          {/* ── Summary Sensor Pill (Screen 1 style with links) ─────── */}
           <section
-            className="p-3.5 rounded-3xl bg-[#121722] border border-white/10 shadow-lg grid grid-cols-3 gap-2 text-center"
+            className="p-3.5 rounded-3xl bg-[#121722] border border-white/10 shadow-lg grid grid-cols-3 gap-2 text-center select-none"
             aria-label="Summary sensors"
           >
-            <div className="flex items-center justify-center gap-2 p-1">
+            <Link
+              href="/climate"
+              className="flex items-center justify-center gap-2 p-1 hover:bg-white/[0.04] rounded-2xl transition-colors"
+            >
               <Thermometer className="w-4 h-4 text-orange-400" />
               <div className="text-left">
                 <span className="text-[10px] uppercase font-bold text-neutral-400 block">Temp</span>
                 <span className="text-xs font-bold text-white">{data.env.roomTemp.toFixed(1)}°C</span>
               </div>
-            </div>
+            </Link>
 
-            <div className="flex items-center justify-center gap-2 p-1 border-x border-white/[0.08]">
+            <Link
+              href="/climate"
+              className="flex items-center justify-center gap-2 p-1 border-x border-white/[0.08] hover:bg-white/[0.04] rounded-2xl transition-colors"
+            >
               <Droplets className="w-4 h-4 text-sky-400" />
               <div className="text-left">
                 <span className="text-[10px] uppercase font-bold text-neutral-400 block">Humidity</span>
                 <span className="text-xs font-bold text-white">{data.env.roomHumidity.toFixed(0)}%</span>
               </div>
-            </div>
+            </Link>
 
-            <div className="flex items-center justify-center gap-2 p-1">
+            <Link
+              href="/energy"
+              className="flex items-center justify-center gap-2 p-1 hover:bg-white/[0.04] rounded-2xl transition-colors"
+            >
               <Zap className="w-4 h-4 text-amber-400" />
               <div className="text-left">
                 <span className="text-[10px] uppercase font-bold text-neutral-400 block">Power</span>
                 <span className="text-xs font-bold text-white">{data.power.power.toFixed(0)}W</span>
               </div>
-            </div>
+            </Link>
           </section>
 
           {/* ── Horizontal Quick Scenes ─────────────────────────────── */}
@@ -245,112 +237,72 @@ export default function Home() {
             </div>
           </section>
 
-          {/* ── Climate Dial & Environment Gauge (Screen 2 style) ───── */}
-          <section id="climate" aria-label="Room Climate">
-            <ClimateDial
-              temperature={data.env.roomTemp}
-              humidity={data.env.roomHumidity}
-              pressure={data.env.pressure ?? 1009.1}
-              airQuality={data.env.airQuality}
-              motionDetected={data.pir.motion}
-            />
-          </section>
+          {/* ── Quick Overview Navigation Cards ─────────────────────── */}
+          <section className="grid grid-cols-2 gap-3 pt-1" aria-label="Section shortcuts">
+            {/* Climate Link Card */}
+            <Link
+              href="/climate"
+              className="group p-4 rounded-3xl bg-[#121722] border border-white/10 hover:border-orange-500/40 transition-all flex flex-col justify-between select-none"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-9 h-9 rounded-2xl bg-orange-500/15 text-orange-400 flex items-center justify-center">
+                  <Thermometer className="w-4 h-4" />
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-neutral-500 group-hover:text-orange-400 transition-colors" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-white block">Climate & Air</span>
+                <span className="text-[11px] text-neutral-400">
+                  {data.env.roomTemp.toFixed(1)}°C • {data.env.roomHumidity.toFixed(0)}%
+                </span>
+              </div>
+            </Link>
 
-          {/* ── Power Monitor Card ──────────────────────────────────── */}
-          <section
-            id="energy"
-            className="rounded-3xl bg-[#121722] border border-white/10 p-5 shadow-xl text-white select-none"
-            aria-label="Power Monitor"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+            {/* Energy Link Card */}
+            <Link
+              href="/energy"
+              className="group p-4 rounded-3xl bg-[#121722] border border-white/10 hover:border-amber-500/40 transition-all flex flex-col justify-between select-none"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-9 h-9 rounded-2xl bg-amber-500/15 text-amber-400 flex items-center justify-center">
                   <Zap className="w-4 h-4" />
                 </div>
-                <div>
-                  <h2 className="font-bold text-sm tracking-tight">Power Monitor</h2>
-                  <p className="text-[11px] text-neutral-400">PZEM-004T Real-time Metrics</p>
-                </div>
+                <ArrowUpRight className="w-4 h-4 text-neutral-500 group-hover:text-amber-400 transition-colors" />
               </div>
-
-              {/* Power Quality Badge based on PF */}
-              <span
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${
-                  (data.power.pf ?? 1.0) >= 0.95
-                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                    : (data.power.pf ?? 1.0) >= 0.85
-                    ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
-                    : "bg-rose-500/15 text-rose-400 border-rose-500/30"
-                }`}
-                title={`Power Factor: ${(data.power.pf ?? 1.0).toFixed(2)}`}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
-                {(data.power.pf ?? 1.0).toFixed(2)} PF • {getPfClassification(data.power.pf ?? 1.0)}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-4 gap-2 text-center pb-3 border-b border-white/[0.08]">
-              <div className="p-2 rounded-2xl bg-[#171E2C] border border-white/[0.05]">
-                <span className="text-[10px] text-neutral-400 font-semibold uppercase block">Voltage</span>
-                <span className="text-base font-bold text-white">{data.power.voltage.toFixed(0)}</span>
-                <span className="text-[10px] text-neutral-400 font-normal"> V</span>
+              <div>
+                <span className="text-xs font-bold text-white block">Energy Monitor</span>
+                <span className="text-[11px] text-neutral-400">
+                  {data.power.power.toFixed(0)}W • {(data.power.pf ?? 1.0).toFixed(2)} PF
+                </span>
               </div>
+            </Link>
+          </section>
 
-              <div className="p-2 rounded-2xl bg-[#171E2C] border border-white/[0.05]">
-                <span className="text-[10px] text-neutral-400 font-semibold uppercase block">Current</span>
-                <span className="text-base font-bold text-white">{data.power.current.toFixed(2)}</span>
-                <span className="text-[10px] text-neutral-400 font-normal"> A</span>
+          {/* Server status banner */}
+          <Link
+            href="/server"
+            className="p-4 rounded-3xl bg-[#121722] border border-white/10 hover:border-emerald-500/30 transition-all flex items-center justify-between select-none group block"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+                <Server className="w-4 h-4" />
               </div>
-
-              <div className="p-2 rounded-2xl bg-[#171E2C] border border-white/[0.05]">
-                <span className="text-[10px] text-neutral-400 font-semibold uppercase block">Power</span>
-                <span className="text-base font-bold text-amber-400">{data.power.power.toFixed(0)}</span>
-                <span className="text-[10px] text-neutral-400 font-normal"> W</span>
-              </div>
-
-              <div className="p-2 rounded-2xl bg-[#171E2C] border border-white/[0.05]">
-                <span className="text-[10px] text-neutral-400 font-semibold uppercase block">Energy</span>
-                <span className="text-base font-bold text-white">{data.power.energy.toFixed(1)}</span>
-                <span className="text-[10px] text-neutral-400 font-normal"> kWh</span>
+              <div>
+                <span className="text-xs font-bold text-white block">Home Server Gateway</span>
+                <span className="text-[10px] text-neutral-400">
+                  {data.server.online ? "Online (Port 22 SSH)" : "Offline • Tap for WoL"}
+                </span>
               </div>
             </div>
-
-            {/* Apparent Power & Frequency Row */}
-            <div className="pt-3 flex items-center justify-between text-[11px] text-neutral-400 font-medium px-1">
-              <span>
-                Apparent:{" "}
-                <strong className="text-neutral-200">
-                  {Math.round(data.power.voltage * data.power.current)} VA
-                </strong>
-              </span>
-              <span>
-                Grid: <strong className="text-neutral-200">50 Hz • 230V RMS</strong>
-              </span>
-            </div>
-          </section>
-
-          {/* ── Home Server Control (Wake-on-LAN) ───────────────────── */}
-          <section id="server">
-            <ServerControl server={data.server} onWake={wakeServer} />
-          </section>
-
-          {/* ── System Health ───────────────────────────────────────── */}
-          <section id="system">
-            <SystemHealth sys={data.sys} />
-          </section>
-
-          {/* ── Live Event Log ──────────────────────────────────────── */}
-          <section>
-            <EventLog logs={logs} onClear={clearLogs} />
-          </section>
+            <span className="text-[11px] font-semibold text-emerald-400 group-hover:translate-x-0.5 transition-transform">
+              Manage →
+            </span>
+          </Link>
         </div>
       </main>
 
       {/* Floating Glassmorphic Bottom Navigation Bar */}
-      <BottomNav
-        activeTab={activeNavTab}
-        onTabChange={(tab) => setActiveNavTab(tab)}
-      />
+      <BottomNav />
     </div>
   );
 }
