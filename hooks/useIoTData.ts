@@ -18,7 +18,8 @@ import mqtt, { MqttClient } from "mqtt";
 export interface EnvData {
   roomTemp: number;
   roomHumidity: number;
-  internalTemp: number; // Box internal temperature or pressure
+  pressure: number; // Barometric pressure (hPa)
+  internalTemp?: number; // Legacy alias
   airQuality: number | string; // Air quality index or label
 }
 
@@ -78,7 +79,8 @@ const initialMockData: IoTPayload = {
   env: {
     roomTemp: 24.5,
     roomHumidity: 45.2,
-    internalTemp: 30.1,
+    pressure: 1009.1,
+    internalTemp: 1009.1,
     airQuality: 120,
   },
   power: {
@@ -216,7 +218,8 @@ export function useIoTData() {
             env: {
               roomTemp: typeof json.env?.roomTemp === "string" ? parseFloat(json.env.roomTemp) : (json.env?.roomTemp ?? 0),
               roomHumidity: typeof json.env?.roomHumidity === "string" ? parseFloat(json.env.roomHumidity) : (json.env?.roomHumidity ?? 0),
-              internalTemp: typeof json.env?.pressure === "string" ? parseFloat(json.env.pressure) : (json.env?.pressure ?? json.env?.internalTemp ?? 0),
+              pressure: typeof json.env?.pressure === "string" ? parseFloat(json.env.pressure) : (json.env?.pressure ?? 1009.1),
+              internalTemp: typeof json.env?.pressure === "string" ? parseFloat(json.env.pressure) : (json.env?.pressure ?? 1009.1),
               airQuality: json.env?.airQuality ?? 0,
             },
             power: {

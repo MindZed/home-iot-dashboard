@@ -92,9 +92,9 @@ export default function Home() {
                 value={`${data.env.roomHumidity.toFixed(0)}%`}
               />
               <SensorTile
-                icon="🌡️"
-                label="Box Temp"
-                value={`${(data.env.internalTemp ?? (data.env as any).pressure ?? 0).toFixed(1)}°C`}
+                icon="🌬️"
+                label="Pressure"
+                value={`${(data.env.pressure ?? 1009.1).toFixed(1)} hPa`}
               />
               <SensorTile
                 icon="🌿"
