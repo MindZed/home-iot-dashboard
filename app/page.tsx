@@ -11,6 +11,7 @@ import { motion, Variants } from "framer-motion";
 
 import SystemHealth from "@/components/SystemHealth";
 import EventLog from "@/components/EventLog";
+import ServerControl from "@/components/ServerControl";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -28,7 +29,7 @@ const itemVariants: Variants = {
 };
 
 export default function Home() {
-  const { data, error, logs, clearLogs, toggleRelay, pendingRelayIds } = useIoTData();
+  const { data, error, logs, clearLogs, toggleRelay, pendingRelayIds, wakeServer } = useIoTData();
 
   if (!data) {
     return (
@@ -173,6 +174,11 @@ export default function Home() {
               />
             </div>
           </motion.section>
+
+          {/* ── Home Server Control (Wake-on-LAN) ───────────────────── */}
+          <motion.div variants={itemVariants}>
+            <ServerControl server={data.server} onWake={wakeServer} />
+          </motion.div>
 
           {/* ── System Health ───────────────────────────────────────── */}
           <motion.div variants={itemVariants}>
