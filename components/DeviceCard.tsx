@@ -1,28 +1,34 @@
 // components/DeviceCard.tsx
-// Renders a single smart device control card with edge auto-off timer support.
-// CRITICAL: The visual ON/OFF state is driven entirely by the `hasLoad` prop (CT sensor),
-// NOT by the relay state. In a 2-way switching setup, only current flow tells the truth.
+// 2x2 Grid Device Card inspired by Screen 1 of the reference smart home design.
+// Active state lights up with a vibrant sunset-orange gradient glow.
+// Visual state is driven 100% by CT sensor current flow (`hasLoad`).
 
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence, Variants } from "framer-motion";
+import { motion } from "framer-motion";
+import {
+  Lightbulb,
+  Fan,
+  PlugZap,
+  Flame,
+  Clock,
+  Wifi,
+  Radio,
+} from "lucide-react";
+import TimerModal from "./TimerModal";
 
 interface DeviceCardProps {
   id: number;
   title: string;
-  type: "light" | "fan" | "plug";
-  hasLoad: boolean; // CT sensor — this IS the source of truth for ON/OFF
+  type: "light" | "fan" | "plug" | "heater";
+  hasLoad: boolean; // CT sensor — source of truth for ON/OFF
   onToggle: (id: number) => void;
   isPending?: boolean;
   timerSec?: number;
-  onSetTimer?: (id: number, seconds: number) => void;
+  timerAction?: "off" | "on" | "none";
+  onSetTimer?: (id: number, seconds: number, action: "off" | "on") => void;
 }
-
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-};
 
 export default function DeviceCard({
   id,
@@ -32,113 +38,149 @@ export default function DeviceCard({
   onToggle,
   isPending = false,
   timerSec = 0,
+  timerAction = "none",
   onSetTimer,
 }: DeviceCardProps) {
-  const [showTimerMenu, setShowTimerMenu] = useState(false);
+  const [isTimerModalOpen, setIsTimerModalOpen] = useState(false);
 
-  const getIcon = () => {
-    if (type === "light") return "💡";
-    if (type === "fan") return "🌀";
-    return "🔌";
+  // Select matching Lucide vector icon
+  const renderIcon = () => {
+    const iconClass = "w-6 h-6";
+    switch (type) {
+      case "light":
+        return <Lightbulb className={iconClass} />;
+      case "fan":
+        return <Fan className={`${iconClass} ${hasLoad ? "animate-spin" : ""}`} style={{ animationDuration: "3s" }} />;
+      case "heater":
+        return <Flame className={iconClass} />;
+      case "plug":
+      default:
+        return <PlugZap className={iconClass} />;
+    }
   };
 
   const formatTimer = (sec: number) => {
     const mins = Math.floor(sec / 60);
     const remainingSec = sec % 60;
     if (mins === 0) return `${remainingSec}s`;
-    return `${mins}m ${remainingSec > 0 ? `${remainingSec}s` : ""}`;
-  };
-
-  const handleSelectTimer = (sec: number) => {
-    if (onSetTimer) {
-      onSetTimer(id, sec);
-    }
-    setShowTimerMenu(false);
+    if (mins < 60) return `${mins}m ${remainingSec > 0 ? `${remainingSec}s` : ""}`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h}h ${m}m`;
   };
 
   return (
-    <motion.div
-      variants={itemVariants}
-      className={`
-        relative overflow-hidden rounded-2xl p-5 
-        flex flex-col gap-3
-        transition-colors duration-300
-        ${
-          hasLoad
-            ? "bg-linear-to-br from-blue-50 to-indigo-50 dark:from-red-950/40 dark:to-neutral-900 border border-blue-200/60 dark:border-red-500/30 shadow-md shadow-blue-100/50 dark:shadow-red-500/10"
-            : "bg-white dark:bg-neutral-900 border border-gray-200/80 dark:border-neutral-800 shadow-sm"
-        }
-      `}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {/* Icon */}
+    <>
+      <motion.div
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        className={`
+          relative rounded-3xl p-4 flex flex-col justify-between min-h-[160px]
+          transition-all duration-300 select-none overflow-hidden
+          ${
+            hasLoad
+              ? "bg-gradient-to-br from-amber-500 via-orange-600 to-rose-600 text-white shadow-xl shadow-orange-600/30 border border-orange-400/40"
+              : "bg-[#121722]/90 text-neutral-300 border border-white/[0.08] shadow-md hover:border-white/20"
+          }
+        `}
+      >
+        {/* Top ambient highlight on active card */}
+        {hasLoad && (
+          <div className="absolute top-0 right-0 -mr-8 -mt-8 w-24 h-24 rounded-full bg-white/20 blur-xl pointer-events-none" />
+        )}
+
+        {/* Top Row: Icon Badge + Signal / Timer Status */}
+        <div className="flex items-center justify-between">
           <div
             className={`
-              flex items-center justify-center w-12 h-12 text-2xl rounded-xl
-              transition-colors duration-300
+              w-11 h-11 rounded-2xl flex items-center justify-center transition-colors
               ${
                 hasLoad
-                  ? "bg-blue-500/15 dark:bg-red-500/20 scale-105"
-                  : "bg-gray-100 dark:bg-neutral-800"
+                  ? "bg-white/20 backdrop-blur-md text-white shadow-inner"
+                  : "bg-[#1C2333] text-neutral-400 border border-white/[0.06]"
               }
             `}
           >
-            {getIcon()}
+            {renderIcon()}
           </div>
 
-          {/* Title & Status */}
-          <div>
-            <h3
-              className={`font-semibold transition-colors duration-300 ${
-                hasLoad ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-neutral-400"
-              }`}
-            >
-              {title}
-            </h3>
-            <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-1.5">
+            {timerSec > 0 ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsTimerModalOpen(true);
+                }}
+                className={`
+                  flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border
+                  transition-all animate-pulse
+                  ${
+                    hasLoad
+                      ? "bg-black/30 border-white/30 text-white"
+                      : "bg-orange-500/20 border-orange-500/40 text-orange-400"
+                  }
+                `}
+                title="Click to manage edge timer"
+              >
+                <Clock className="w-3 h-3" />
+                <span>{formatTimer(timerSec)}</span>
+              </button>
+            ) : (
               <span
-                className={`text-sm font-medium transition-colors duration-300 ${
-                  hasLoad ? "text-blue-600 dark:text-red-400" : "text-gray-400 dark:text-neutral-500"
+                className={`text-[11px] p-1.5 rounded-full ${
+                  hasLoad ? "text-white/70" : "text-neutral-500"
                 }`}
               >
-                {hasLoad ? "Active" : "Off"}
+                <Wifi className="w-3.5 h-3.5" />
               </span>
-
-              {/* Edge countdown pill if timer is active */}
-              {timerSec > 0 && (
-                <span
-                  onClick={() => handleSelectTimer(0)}
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-400 border border-amber-300/60 dark:border-amber-700/40 cursor-pointer hover:bg-amber-200 transition-colors"
-                  title="Click to cancel timer"
-                >
-                  <span className="animate-pulse">⏱️</span> {formatTimer(timerSec)}
-                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold ml-0.5">×</span>
-                </span>
-              )}
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Right side controls: Timer button & Toggle */}
-        <div className="flex items-center gap-2.5">
-          {onSetTimer && (
-            <button
-              onClick={() => setShowTimerMenu((prev) => !prev)}
-              aria-label={`Set timer for ${title}`}
-              className={`
-                p-2 rounded-xl text-sm transition-all focus:outline-none
-                ${
-                  showTimerMenu || timerSec > 0
-                    ? "bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-700/40"
-                    : "bg-gray-100 dark:bg-neutral-800 text-gray-500 dark:text-neutral-400 hover:bg-gray-200/80 dark:hover:bg-neutral-700"
-                }
-              `}
-              title="On-device edge timer"
-            >
-              ⏱️
-            </button>
-          )}
+        {/* Middle Row: Title & Subtitle */}
+        <div className="my-2">
+          <h3
+            className={`font-bold text-sm tracking-tight line-clamp-1 ${
+              hasLoad ? "text-white" : "text-white"
+            }`}
+          >
+            {title}
+          </h3>
+
+          <p
+            className={`text-[11px] font-medium mt-0.5 ${
+              hasLoad ? "text-white/85" : "text-neutral-400"
+            }`}
+          >
+            {timerSec > 0
+              ? `${timerAction === "off" ? "Auto-OFF" : "Auto-ON"} in ${formatTimer(timerSec)}`
+              : hasLoad
+              ? "Active • Load ON"
+              : "Standby • Load OFF"}
+          </p>
+        </div>
+
+        {/* Bottom Row: Quick Timer Modal Trigger + Toggle Switch */}
+        <div className="flex items-center justify-between pt-1 border-t border-white/[0.08]">
+          {/* Timer dialog button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsTimerModalOpen(true);
+            }}
+            className={`
+              p-1.5 rounded-xl text-xs transition-all flex items-center gap-1 font-semibold
+              ${
+                hasLoad
+                  ? "bg-black/20 hover:bg-black/30 text-white"
+                  : "bg-[#1B2232] hover:bg-[#252F45] text-neutral-300"
+              }
+            `}
+            title="Set on-device edge timer"
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span className="text-[10px]">Timer</span>
+          </button>
 
           {/* Toggle Switch */}
           <button
@@ -147,16 +189,15 @@ export default function DeviceCard({
             aria-busy={isPending}
             disabled={isPending}
             className={`
-              relative w-14 h-8 flex items-center rounded-full p-1
+              relative w-12 h-7 flex items-center rounded-full p-1
               transition-all duration-300 focus:outline-none
-              focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-red-400 focus-visible:ring-offset-2
               disabled:cursor-wait disabled:opacity-80
               ${
                 isPending
-                  ? "bg-amber-400 dark:bg-amber-500 shadow-[0_0_0_6px_rgba(251,191,36,0.18)] dark:shadow-[0_0_0_6px_rgba(251,191,36,0.14)]"
+                  ? "bg-amber-300 shadow-[0_0_0_4px_rgba(251,191,36,0.3)]"
                   : hasLoad
-                    ? "bg-blue-500 dark:bg-red-600"
-                    : "bg-gray-300 dark:bg-neutral-700"
+                  ? "bg-white/95"
+                  : "bg-[#252E42]"
               }
             `}
           >
@@ -165,68 +206,36 @@ export default function DeviceCard({
                 className="absolute inset-0 rounded-full overflow-hidden"
                 aria-hidden="true"
               >
-                <span className="absolute inset-0 bg-linear-to-r from-transparent via-white/35 to-transparent -translate-x-full animate-[shimmer_1.15s_infinite]" />
+                <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-[shimmer_1s_infinite]" />
               </span>
             )}
             <motion.div
               layout
               className={`
-                bg-white w-6 h-6 rounded-full shadow-md
-                transform transition-all duration-300
-                ${isPending ? "opacity-90 scale-95 ring-2 ring-amber-100 dark:ring-amber-200/40 bg-amber-50 dark:bg-amber-100" : "opacity-100"}
-                ${hasLoad ? "translate-x-6" : "translate-x-0"}
+                w-5 h-5 rounded-full shadow-md transform transition-all duration-300
+                ${
+                  hasLoad
+                    ? "translate-x-5 bg-orange-600"
+                    : "translate-x-0 bg-neutral-400"
+                }
               `}
             />
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Expandable Quick Timer Presets */}
-      <AnimatePresence>
-        {showTimerMenu && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden pt-2 border-t border-gray-100 dark:border-neutral-800/80"
-          >
-            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-neutral-400 mb-2 font-medium">
-              <span>On-Device Auto-Off Timer:</span>
-              {timerSec > 0 && (
-                <button
-                  onClick={() => handleSelectTimer(0)}
-                  className="text-red-500 dark:text-red-400 font-semibold hover:underline"
-                >
-                  Cancel Timer
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                { label: "5m", sec: 300 },
-                { label: "15m", sec: 900 },
-                { label: "30m", sec: 1800 },
-                { label: "1h", sec: 3600 },
-              ].map((preset) => (
-                <button
-                  key={preset.sec}
-                  onClick={() => handleSelectTimer(preset.sec)}
-                  className={`
-                    py-1.5 px-2 rounded-xl text-xs font-semibold transition-all
-                    ${
-                      timerSec > 0 && Math.abs(timerSec - preset.sec) < 30
-                        ? "bg-amber-500 text-white shadow-sm"
-                        : "bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 hover:bg-amber-100 dark:hover:bg-amber-950/40"
-                    }
-                  `}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+      {/* Two-Way Rotary Timer Modal */}
+      {onSetTimer && (
+        <TimerModal
+          isOpen={isTimerModalOpen}
+          onClose={() => setIsTimerModalOpen(false)}
+          deviceId={id}
+          deviceTitle={title}
+          hasLoad={hasLoad}
+          activeTimerSec={timerSec}
+          onSetTimer={onSetTimer}
+        />
+      )}
+    </>
   );
 }

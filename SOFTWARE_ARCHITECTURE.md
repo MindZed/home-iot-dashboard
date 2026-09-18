@@ -17,14 +17,22 @@ This document contains the architecture, tech stack, and structure for the `home
 - Completely decouples the dashboard from the local home server and Cloudflare tunnel (100% Vercel compatible).
 - Subscribes to `home/node1/telemetry`, `home/node1/status`, `home/node1/heartbeat`, `home/node1/relay/+/timer_ack`, `home/node1/wol/ack`.
 - Controls relays with sub-40ms latency by publishing directly to `home/node1/relay/{id}/toggle`.
-- On-device Edge Timers: Publishes to `home/node1/relay/{id}/timer` (`{"seconds": 300}`); ESP32 manages countdown internally on edge.
+- On-device Two-Way Edge Timers: Publishes to `home/node1/relay/{id}/timer` (`{"seconds": 300, "action": "off"}` or `{"seconds": 600, "action": "on"}`); ESP32 manages hardware countdown up to 24h on edge.
 - Sends Wake-on-LAN packets on demand by publishing to `home/node1/wol/toggle` with live server status feedback.
 - 1-Tap Master Scenes ("Leave Home / All Off", "Work Mode", "Night Mode", "All On").
 - Power Quality Monitoring: Displays real-time Power Factor (PF) load classification and Apparent Power (VA).
 
+## UI/UX Architecture & Mobile PWA Design
+- Dark obsidian theme (`#0B0E14`) inspired by modern smart home interfaces (@uix.vikram).
+- **LoadingScreen**: Animated concentric pulsing hub showing live WSS handshake until ESP32 telemetry syncs.
+- **DeviceCard**: 2x2 grid layout with sunset-orange gradient active glow (`from-amber-500 via-orange-600 to-rose-600`), CT-driven states, and Lucide vector icons.
+- **TimerModal**: 360° interactive rotary dial supporting two-way auto-off / auto-on timers up to 24 hours.
+- **ClimateDial**: Radial temperature gauge with circular ticks, ambient needle, humidity, pressure, and air quality bar.
+- **BottomNav**: Elevated floating glassmorphism pill bar with Lucide icons (`Home`, `Climate`, `Energy`, `Server`, `Settings`).
+
 ## Directory Structure
 - `app/`: Next.js App Router endpoints and pages.
-- `components/`: Reusable React UI components (`DeviceCard`, `ServerControl`, `QuickScenes`, `SystemHealth`, `EventLog`, `BottomNav`).
+- `components/`: Reusable React UI components (`DeviceCard`, `ClimateDial`, `TimerModal`, `LoadingScreen`, `ServerControl`, `QuickScenes`, `SystemHealth`, `EventLog`, `BottomNav`).
 - `context/`: React context providers for state management.
 - `hooks/`: Custom React hooks.
 - `lib/`: Utility functions and shared core logic.

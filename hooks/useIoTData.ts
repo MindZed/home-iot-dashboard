@@ -38,16 +38,20 @@ export interface PirData {
 export interface RelayData {
   r1: boolean;
   ct1: boolean;
-  t1: number; // On-device auto-off countdown (seconds remaining, 0 if inactive)
+  t1: number; // On-device countdown (seconds remaining, 0 if inactive)
+  tAct1: "off" | "on" | "none"; // Target action: will turn OFF or turn ON
   r2: boolean;
   ct2: boolean;
   t2: number;
+  tAct2: "off" | "on" | "none";
   r3: boolean;
   ct3: boolean;
   t3: number;
+  tAct3: "off" | "on" | "none";
   r4: boolean;
   ct4: boolean;
   t4: number;
+  tAct4: "off" | "on" | "none";
 }
 
 export interface SysData {
@@ -102,15 +106,19 @@ const initialMockData: IoTPayload = {
     r1: true,
     ct1: true,
     t1: 0,
+    tAct1: "none",
     r2: false,
     ct2: false,
     t2: 0,
+    tAct2: "none",
     r3: true,
     ct3: false,
     t3: 0,
+    tAct3: "none",
     r4: false,
     ct4: false,
     t4: 0,
+    tAct4: "none",
   },
   sys: {
     ramFree: 128000,
@@ -142,6 +150,7 @@ const TOPIC_WOL_ACK = "home/node1/wol/ack";
 
 export function useIoTData() {
   const [data, setData] = useState<IoTPayload | null>(null);
+  const [isConnecting, setIsConnecting] = useState<boolean>(true);
   const [error, setError] = useState<boolean>(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [pendingRelayIds, setPendingRelayIds] = useState<number[]>([]);
@@ -151,6 +160,7 @@ export function useIoTData() {
   const prevDataRef = useRef<IoTPayload | null>(null);
 
   const handleNewData = useCallback((newData: IoTPayload) => {
+    setIsConnecting(false);
     if (prevDataRef.current) {
       const newLogs: LogEntry[] = [];
       const now = new Date().toLocaleTimeString([], { hour12: false });
@@ -247,15 +257,19 @@ export function useIoTData() {
               r1: Boolean(channels[0]?.relay ?? json.relays?.r1),
               ct1: Boolean(channels[0]?.load ?? json.relays?.ct1),
               t1: Number(channels[0]?.timerSec ?? 0),
+              tAct1: (channels[0]?.timerAction as "off" | "on" | "none") || (channels[0]?.timerSec > 0 ? "off" : "none"),
               r2: Boolean(channels[1]?.relay ?? json.relays?.r2),
               ct2: Boolean(channels[1]?.load ?? json.relays?.ct2),
               t2: Number(channels[1]?.timerSec ?? 0),
+              tAct2: (channels[1]?.timerAction as "off" | "on" | "none") || (channels[1]?.timerSec > 0 ? "off" : "none"),
               r3: Boolean(channels[2]?.relay ?? json.relays?.r3),
               ct3: Boolean(channels[2]?.load ?? json.relays?.ct3),
               t3: Number(channels[2]?.timerSec ?? 0),
+              tAct3: (channels[2]?.timerAction as "off" | "on" | "none") || (channels[2]?.timerSec > 0 ? "off" : "none"),
               r4: Boolean(channels[3]?.relay ?? json.relays?.r4),
               ct4: Boolean(channels[3]?.load ?? json.relays?.ct4),
               t4: Number(channels[3]?.timerSec ?? 0),
+              tAct4: (channels[3]?.timerAction as "off" | "on" | "none") || (channels[3]?.timerSec > 0 ? "off" : "none"),
             },
             sys: {
               ramFree: (json.sys?.ramFreeKb ?? 0) * 1024,
@@ -276,11 +290,12 @@ export function useIoTData() {
           const now = new Date().toLocaleTimeString([], { hour12: false });
           const relayId = json.id;
           const sec = json.timerSec ?? 0;
+          const action = json.action || (json.targetState ? "on" : "off");
           const mins = Math.round(sec / 60);
           setLogs((prev) => [
             {
               time: now,
-              message: sec > 0 ? `⏱️ Device ${relayId} edge timer set for ${mins > 0 ? `${mins}m` : `${sec}s`}` : `⏱️ Device ${relayId} timer cancelled`,
+              message: sec > 0 ? `⏱️ Device ${relayId} Auto-${action.toUpperCase()} timer set for ${mins > 0 ? `${mins}m` : `${sec}s`}` : `⏱️ Device ${relayId} timer cancelled`,
               type: "info",
             },
             ...prev.slice(0, 14),
@@ -315,12 +330,12 @@ export function useIoTData() {
       setError(true);
     });
 
-    // If no real data arrives within 2 seconds of mounting, load mock data as placeholder
+    // If no real data arrives within 2.5 seconds of mounting, load mock data as placeholder
     const timeout = setTimeout(() => {
       if (!prevDataRef.current) {
         handleNewData({ ...mockDataRef.current });
       }
-    }, 2000);
+    }, 2500);
 
     return () => {
       clearTimeout(timeout);
@@ -386,42 +401,42 @@ export function useIoTData() {
     }
   }, []);
 
-  // Sends on-device timer command to ESP32: home/node1/relay/{id}/timer
-  const setRelayTimer = useCallback((id: number, seconds: number) => {
+  // Sends on-device two-way timer command to ESP32: home/node1/relay/{id}/timer
+  const setRelayTimer = useCallback((id: number, seconds: number, action: "off" | "on" = "off") => {
     if (clientRef.current && clientRef.current.connected) {
       const topic = `home/node1/relay/${id}/timer`;
-      const payload = JSON.stringify({ seconds });
+      const payload = JSON.stringify({ seconds, action });
       clientRef.current.publish(topic, payload, { qos: 1 }, (err) => {
         if (err) {
           console.error(`[MQTT] Failed to send timer for relay ${id}:`, err);
         } else {
-          console.log(`[MQTT] Published timer (${seconds}s) to ${topic}`);
+          console.log(`[MQTT] Published timer (${seconds}s, action: ${action}) to ${topic}`);
         }
       });
       // Optimistically update local timer and load state
       setData((prev) => {
         if (!prev) return prev;
         const tKey = `t${id}` as keyof RelayData;
-        const ctKey = `ct${id}` as keyof RelayData;
+        const tActKey = `tAct${id}` as keyof RelayData;
         return {
           ...prev,
           relays: {
             ...prev.relays,
             [tKey]: seconds,
-            ...(seconds > 0 ? { [ctKey]: true } : {}),
+            [tActKey]: seconds > 0 ? action : "none",
           },
         };
       });
     } else {
       console.warn(`[MQTT] Not connected — mocking timer for relay ${id}`);
       const tKey = `t${id}` as keyof RelayData;
-      const ctKey = `ct${id}` as keyof RelayData;
+      const tActKey = `tAct${id}` as keyof RelayData;
       mockDataRef.current = {
         ...mockDataRef.current,
         relays: {
           ...mockDataRef.current.relays,
           [tKey]: seconds,
-          ...(seconds > 0 ? { [ctKey]: true } : {}),
+          [tActKey]: seconds > 0 ? action : "none",
         },
       };
       handleNewData({ ...mockDataRef.current });
@@ -430,5 +445,15 @@ export function useIoTData() {
 
   const clearLogs = useCallback(() => setLogs([]), []);
 
-  return { data, error, logs, clearLogs, toggleRelay, pendingRelayIds, wakeServer, setRelayTimer };
+  return {
+    data,
+    isConnecting,
+    error,
+    logs,
+    clearLogs,
+    toggleRelay,
+    pendingRelayIds,
+    wakeServer,
+    setRelayTimer,
+  };
 }
