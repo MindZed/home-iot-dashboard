@@ -163,9 +163,37 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
   const clientRef = useRef<MqttClient | null>(null);
   const mockDataRef = useRef<IoTPayload>(structuredClone(initialMockData));
   const prevDataRef = useRef<IoTPayload | null>(null);
+  const optimisticHoldRef = useRef<{
+    [id: number]: { holdUntil: number; targetLoad: boolean };
+  }>({});
 
   const handleNewData = useCallback((newData: IoTPayload) => {
     setIsConnecting(false);
+
+    // Guard optimistic toggle states: wait at least 1500ms for hardware ACK before allowing reversion
+    const nowMs = Date.now();
+    for (let i = 1; i <= 4; i++) {
+      const hold = optimisticHoldRef.current[i];
+      if (hold) {
+        const ctKey = `ct${i as 1 | 2 | 3 | 4}` as "ct1" | "ct2" | "ct3" | "ct4";
+        const rKey = `r${i as 1 | 2 | 3 | 4}` as "r1" | "r2" | "r3" | "r4";
+        if (nowMs < hold.holdUntil) {
+          // If incoming telemetry has already caught up with desired state, release hold
+          if (newData.relays[ctKey] === hold.targetLoad) {
+            delete optimisticHoldRef.current[i];
+            setPendingRelayIds((current) => current.filter((id) => id !== i));
+          } else {
+            // Keep optimistic desired state to avoid flickering/switching back during the 1500ms window
+            newData.relays[ctKey] = hold.targetLoad;
+            newData.relays[rKey] = hold.targetLoad;
+          }
+        } else {
+          // 1500ms elapsed without ACK: release hold and accept actual hardware state
+          delete optimisticHoldRef.current[i];
+          setPendingRelayIds((current) => current.filter((id) => id !== i));
+        }
+      }
+    }
     if (prevDataRef.current) {
       const newLogs: LogEntry[] = [];
       const now = new Date().toLocaleTimeString([], { hour12: false });
@@ -298,6 +326,9 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
           const rKey = `r${relayId}` as keyof RelayData;
           const ctKey = `ct${relayId}` as keyof RelayData;
 
+          // Confirmed by hardware! Clear optimistic hold immediately
+          delete optimisticHoldRef.current[relayId];
+
           setData((prev) => {
             if (!prev) return prev;
             return {
@@ -372,18 +403,25 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
     const rKey = `r${id}` as keyof RelayData;
     const ctKey = `ct${id}` as keyof RelayData;
 
-    // 1. Optimistic UI update in 0ms so the user gets instant visual response
+    let targetLoad = true;
     setData((prev) => {
       if (!prev) return prev;
+      targetLoad = !prev.relays[ctKey];
       return {
         ...prev,
         relays: {
           ...prev.relays,
           [rKey]: !prev.relays[rKey],
-          [ctKey]: !prev.relays[ctKey],
+          [ctKey]: targetLoad,
         },
       };
     });
+
+    // Guard optimistic state for at least 1500ms before allowing telemetry to switch it back
+    optimisticHoldRef.current[id] = {
+      holdUntil: Date.now() + 1500,
+      targetLoad,
+    };
 
     setPendingRelayIds((current) => (current.includes(id) ? current : [...current, id]));
 
@@ -392,6 +430,7 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
       clientRef.current.publish(topic, "{}", { qos: 1 }, (err) => {
         if (err) {
           console.error(`[MQTT] Failed to publish relay ${id} toggle:`, err);
+          delete optimisticHoldRef.current[id];
           // Revert optimistic state on network error
           setData((prev) => {
             if (!prev) return prev;
@@ -410,10 +449,11 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
         }
       });
 
-      // Safety timeout: if ACK is not received within 3s, clear pending lock
+      // Wait at least 1500ms for acknowledgment before releasing hold
       setTimeout(() => {
+        delete optimisticHoldRef.current[id];
         setPendingRelayIds((current) => current.filter((relayId) => relayId !== id));
-      }, 3000);
+      }, 1500);
     } else {
       console.warn(`[MQTT] Not connected — mocking toggle for relay ${id}`);
       mockDataRef.current = {
@@ -425,6 +465,7 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
         },
       };
       handleNewData({ ...mockDataRef.current });
+      delete optimisticHoldRef.current[id];
       setPendingRelayIds((current) => current.filter((relayId) => relayId !== id));
     }
   }, [handleNewData]);

@@ -19,7 +19,7 @@ This document contains the architecture, tech stack, and structure for the `home
 - Direct browser connection to EMQX Serverless (`wss://z1314459.ala.asia-southeast1.emqxsl.com:8084/mqtt`).
 - Completely decouples the dashboard from the local home server and Cloudflare tunnel (100% Vercel compatible).
 - Subscribes to `home/node1/telemetry`, `home/node1/status`, `home/node1/heartbeat`, `home/node1/relay/+/timer_ack`, `home/node1/wol/ack`.
-- **Optimistic UI Execution & Fast ACKs**: Switch clicks trigger instant 0ms optimistic visual response on the client with dual-transient audio clicks. The dashboard subscribes directly to `home/node1/relay/+/ack`, updating real-time hardware confirmation and clearing pending state in `<30ms` without waiting for the 5-second periodic telemetry loop.
+- **Optimistic UI Execution & Fast ACKs**: Switch clicks trigger instant 0ms optimistic visual response on the client with dual-transient audio clicks. The dashboard subscribes directly to `home/node1/relay/+/ack`, updating real-time hardware confirmation and clearing pending state in `<30ms`. In-flight telemetry is prevented from reverting the optimistic toggle for at least 1500ms before falling back if hardware confirmation is absent.
 - Controls relays with sub-40ms latency by publishing directly to `home/node1/relay/{id}/toggle`.
 - On-device Two-Way Edge Timers: Publishes to `home/node1/relay/{id}/timer` (`{"seconds": 300, "action": "off"}` or `{"seconds": 600, "action": "on"}`); ESP32 manages hardware countdown up to 24h on edge.
 - Sends Wake-on-LAN packets on demand by publishing to `home/node1/wol/toggle` with live server status feedback.
