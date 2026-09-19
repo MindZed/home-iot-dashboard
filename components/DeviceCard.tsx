@@ -17,6 +17,7 @@ import {
   Radio,
 } from "lucide-react";
 import TimerModal from "./TimerModal";
+import { feedback } from "@/lib/feedback";
 
 interface DeviceCardProps {
   id: number;
@@ -166,6 +167,7 @@ export default function DeviceCard({
           <button
             onClick={(e) => {
               e.stopPropagation();
+              feedback.triggerHaptic("light");
               setIsTimerModalOpen(true);
             }}
             className={`
@@ -184,7 +186,10 @@ export default function DeviceCard({
 
           {/* Toggle Switch */}
           <button
-            onClick={() => onToggle(id)}
+            onClick={() => {
+              feedback.playSwitchClick(!hasLoad);
+              onToggle(id);
+            }}
             aria-label={`Toggle ${title}`}
             aria-busy={isPending}
             disabled={isPending}

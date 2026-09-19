@@ -8,6 +8,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Clock, Power, Play, RotateCcw, Plus, Minus } from "lucide-react";
+import { feedback } from "@/lib/feedback";
 
 interface TimerModalProps {
   isOpen: boolean;
@@ -103,7 +104,11 @@ export default function TimerModal({
 
     setTotalMinutes((prev) => {
       const next = Math.round(prev + deltaMins);
-      return Math.max(1, Math.min(1440, next)); // clamped between 1 min and 24 hours
+      const clamped = Math.max(1, Math.min(1440, next));
+      if (clamped !== prev) {
+        feedback.playDialTick();
+      }
+      return clamped;
     });
   };
 
@@ -112,16 +117,19 @@ export default function TimerModal({
   };
 
   const adjustMinutes = (delta: number) => {
+    feedback.playDialTick();
     setTotalMinutes((prev) => Math.max(1, Math.min(1440, prev + delta)));
   };
 
   const handleSave = () => {
+    feedback.playSwitchClick(true);
     const durationSeconds = totalMinutes * 60;
     onSetTimer(deviceId, durationSeconds, action);
     onClose();
   };
 
   const handleCancelTimer = () => {
+    feedback.playSwitchClick(false);
     onSetTimer(deviceId, 0, action);
     onClose();
   };

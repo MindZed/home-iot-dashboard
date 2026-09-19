@@ -27,9 +27,11 @@ This document contains the architecture, tech stack, and structure for the `home
 
 ## UI/UX Architecture & Mobile PWA Design
 - Dark obsidian theme (`#0B0E14`) inspired by modern smart home interfaces (@uix.vikram).
+- **FeedbackEngine (`lib/feedback.ts`, `hooks/useFeedback.ts`)**: Pure Web Audio API synthesized mechanical relay switch click sounds, rotary dial micro-ticks, and 1-tap scene harmonic chimes with `navigator.vibrate` micro-haptics. Zero external sound files. Includes persistent user toggle (`FeedbackToggle`).
+- **MoldComfortCard (`components/MoldComfortCard.tsx`, `lib/climateCalculations.ts`)**: Evaluates real-time perceived temperature ("Feels Like" Heat Index via NOAA Steadman formula), Dew Point condensation margin, and ASHRAE 160 indoor mold spore germination risk (0-100%) with actionable fan ventilation triggers.
 - **LoadingScreen**: Animated concentric pulsing hub showing live WSS handshake until ESP32 telemetry syncs.
-- **DeviceCard**: 2x2 grid layout with sunset-orange gradient active glow (`from-amber-500 via-orange-600 to-rose-600`), CT-driven states, and Lucide vector icons.
-- **TimerModal**: 360° interactive rotary dial supporting two-way auto-off / auto-on timers up to 24 hours.
+- **DeviceCard**: 2x2 grid layout with sunset-orange gradient active glow (`from-amber-500 via-orange-600 to-rose-600`), CT-driven states, tactile sound feedback, and Lucide vector icons.
+- **TimerModal**: 360° interactive rotary dial supporting two-way auto-off / auto-on timers up to 24 hours with dial tick sound feedback.
 - **ClimateDial**: Radial temperature gauge with circular ticks, ambient needle, humidity, pressure, and air quality bar.
 - **BottomNav**: Subtle, textless, floating glassmorphic pill bar (`backdrop-blur-2xl`) with Lucide vector icons (`Home`, `Climate`, `Energy`, `Server`, `Settings`).
 

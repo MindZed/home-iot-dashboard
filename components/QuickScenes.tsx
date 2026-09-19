@@ -6,6 +6,7 @@
 import { motion } from "framer-motion";
 import { PowerOff, Briefcase, Moon, Zap } from "lucide-react";
 import { RelayData } from "@/hooks/useIoTData";
+import { feedback } from "@/lib/feedback";
 
 interface QuickScenesProps {
   relays: RelayData;
@@ -106,7 +107,10 @@ export default function QuickScenes({ relays, onToggle, pendingRelayIds }: Quick
             <motion.button
               key={scene.id}
               whileTap={{ scale: 0.95 }}
-              onClick={scene.action}
+              onClick={() => {
+                feedback.playSceneChime();
+                scene.action();
+              }}
               className={`
                 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl shrink-0 transition-all font-semibold text-xs
                 ${

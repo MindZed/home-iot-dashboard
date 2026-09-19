@@ -8,6 +8,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { Home, Thermometer, Zap, Server, Settings } from "lucide-react";
+import { feedback } from "@/lib/feedback";
 
 export default function BottomNav() {
   const pathname = usePathname();
@@ -32,6 +33,7 @@ export default function BottomNav() {
               key={item.id}
               href={item.href}
               aria-label={item.label}
+              onClick={() => feedback.playNavTap()}
               className="relative p-2.5 rounded-full flex items-center justify-center transition-all group"
             >
               {/* Subtle glass pill behind active icon */}
