@@ -291,6 +291,27 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
 
           handleNewData(transformed);
           setError(false);
+        } else if (topic.startsWith("home/node1/relay/") && topic.endsWith("/ack")) {
+          const relayId = Number(json.id);
+          const relayState = Boolean(json.relay);
+          const loadState = Boolean(json.load);
+          const rKey = `r${relayId}` as keyof RelayData;
+          const ctKey = `ct${relayId}` as keyof RelayData;
+
+          setData((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              relays: {
+                ...prev.relays,
+                [rKey]: relayState,
+                [ctKey]: loadState,
+              },
+            };
+          });
+
+          // Instantly clear pending state
+          setPendingRelayIds((current) => current.filter((id) => id !== relayId));
         } else if (topic.endsWith("/timer_ack")) {
           const now = new Date().toLocaleTimeString([], { hour12: false });
           const relayId = json.id;
@@ -348,6 +369,22 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
 
   // Sends toggle command directly over MQTT to ESP32: home/node1/relay/{id}/toggle
   const toggleRelay = useCallback((id: number) => {
+    const rKey = `r${id}` as keyof RelayData;
+    const ctKey = `ct${id}` as keyof RelayData;
+
+    // 1. Optimistic UI update in 0ms so the user gets instant visual response
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        relays: {
+          ...prev.relays,
+          [rKey]: !prev.relays[rKey],
+          [ctKey]: !prev.relays[ctKey],
+        },
+      };
+    });
+
     setPendingRelayIds((current) => (current.includes(id) ? current : [...current, id]));
 
     if (clientRef.current && clientRef.current.connected) {
@@ -355,21 +392,40 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
       clientRef.current.publish(topic, "{}", { qos: 1 }, (err) => {
         if (err) {
           console.error(`[MQTT] Failed to publish relay ${id} toggle:`, err);
+          // Revert optimistic state on network error
+          setData((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              relays: {
+                ...prev.relays,
+                [rKey]: !prev.relays[rKey],
+                [ctKey]: !prev.relays[ctKey],
+              },
+            };
+          });
+          setPendingRelayIds((current) => current.filter((relayId) => relayId !== id));
         } else {
           console.log(`[MQTT] Published toggle command to ${topic}`);
         }
       });
+
+      // Safety timeout: if ACK is not received within 3s, clear pending lock
+      setTimeout(() => {
+        setPendingRelayIds((current) => current.filter((relayId) => relayId !== id));
+      }, 3000);
     } else {
       console.warn(`[MQTT] Not connected — mocking toggle for relay ${id}`);
-      const ctKey = `ct${id}` as keyof RelayData;
       mockDataRef.current = {
         ...mockDataRef.current,
         relays: {
           ...mockDataRef.current.relays,
           [ctKey]: !mockDataRef.current.relays[ctKey],
+          [rKey]: !mockDataRef.current.relays[rKey],
         },
       };
       handleNewData({ ...mockDataRef.current });
+      setPendingRelayIds((current) => current.filter((relayId) => relayId !== id));
     }
   }, [handleNewData]);
 
