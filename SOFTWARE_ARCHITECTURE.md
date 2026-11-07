@@ -16,7 +16,7 @@ This document contains the architecture, tech stack, and structure for the `home
 - **Global Singleton Provider (`IoTProvider`)**: Wrapped at the application root level in `app/layout.tsx`. Maintains a single persistent WSS MQTT connection across the entire application lifecycle.
 - **Persistent Telemetry Cache**: Page transitions between `/`, `/climate`, `/energy`, `/server`, and `/settings` are pure client-side transitions that share the same global context. No socket disconnects, loading screen flashes, or telemetry refetch delays occur on navigation.
 - **Hook Bridge (`useIoTData`)**: Delegated directly to `useIoTContext()`, preserving 100% backward compatibility with all existing components and pages.
-- Direct browser connection to EMQX Serverless (`wss://z1314459.ala.asia-southeast1.emqxsl.com:8084/mqtt`).
+- Direct browser connection to MindZed Dedicated Broker (`wss://mqtt.mindzed.tech:8084/mqtt`).
 - Completely decouples the dashboard from the local home server and Cloudflare tunnel (100% Vercel compatible).
 - Subscribes to `home/node1/telemetry`, `home/node1/status`, `home/node1/heartbeat`, `home/node1/relay/+/timer_ack`, `home/node1/wol/ack`.
 - **Optimistic UI Execution & Fast ACKs**: Switch clicks trigger instant 0ms optimistic visual response on the client with dual-transient audio clicks. The dashboard subscribes directly to `home/node1/relay/+/ack`, updating real-time hardware confirmation and clearing pending state in `<30ms`. In-flight telemetry is prevented from reverting the optimistic toggle for at least 1500ms before falling back if hardware confirmation is absent.
