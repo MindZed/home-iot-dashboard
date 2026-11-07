@@ -140,7 +140,7 @@ const initialMockData: IoTPayload = {
 
 const MQTT_URL =
   process.env.NEXT_PUBLIC_MQTT_URL ||
-  "wss://mqtt.mindzed.tech:8084/mqtt";
+  "wss://mqtt-ws.mindzed.tech";
 const MQTT_USER = process.env.NEXT_PUBLIC_MQTT_USER || "esp32_office";
 const MQTT_PASS = process.env.NEXT_PUBLIC_MQTT_PASS || "esp32office786";
 
