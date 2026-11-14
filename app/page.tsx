@@ -311,9 +311,9 @@ export default function Home() {
                 <Server className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-xs font-bold text-white block">Home Server Gateway</span>
+                <span className="text-xs font-bold text-white block">Infrastructure & WoL</span>
                 <span className="text-[10px] text-neutral-400">
-                  {data.server.online ? "Online (Port 22 SSH)" : "Offline • Tap for WoL"}
+                  {data.server.online ? "Server: Online" : "Server: Offline"} • {data.laptop?.online ? "Laptop: Online" : "Laptop: Offline"}
                 </span>
               </div>
             </div>

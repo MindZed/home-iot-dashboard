@@ -1,5 +1,5 @@
 // app/server/page.tsx
-// Dedicated Home Server (WoL) & ESP32 Hardware Diagnostics view.
+// Dedicated Infrastructure view: Home Server (WoL), Office Laptop (WoL) & ESP32 Hardware Diagnostics.
 
 "use client";
 
@@ -14,10 +14,10 @@ import BottomNav from "@/components/BottomNav";
 import LoadingScreen from "@/components/LoadingScreen";
 
 export default function ServerPage() {
-  const { data, isConnecting, logs, clearLogs, wakeServer } = useIoTData();
+  const { data, isConnecting, logs, clearLogs, wakeServer, wakeLaptop } = useIoTData();
 
   if (isConnecting && !data) {
-    return <LoadingScreen statusText="Probing Home Server & ESP32 Node..." />;
+    return <LoadingScreen statusText="Probing Infrastructure & ESP32 Node..." />;
   }
 
   if (!data) {
@@ -52,9 +52,30 @@ export default function ServerPage() {
             </div>
           </header>
 
-          {/* ── Server Control (Wake-on-LAN) ─────────────────────────── */}
-          <section aria-label="Wake-on-LAN Control">
-            <ServerControl server={data.server} onWake={wakeServer} />
+          {/* ── Home Server Control (Wake-on-LAN) ────────────────────── */}
+          <section aria-label="Home Server Control">
+            <ServerControl
+              title="Home Server"
+              ip="192.168.0.107"
+              portLabel="SSH :22"
+              mac="70:71:BC:77:51:A3"
+              deviceType="server"
+              server={data.server}
+              onWake={wakeServer}
+            />
+          </section>
+
+          {/* ── Office Laptop Control (Wake-on-LAN) ──────────────────── */}
+          <section aria-label="Office Laptop Control">
+            <ServerControl
+              title="Office Laptop"
+              ip="192.168.0.109"
+              portLabel="Port :445"
+              mac="40:C2:BA:15:55:47"
+              deviceType="laptop"
+              server={data.laptop || { online: false, checking: false, failed: false }}
+              onWake={wakeLaptop}
+            />
           </section>
 
           {/* ── System Diagnostics ──────────────────────────────────── */}

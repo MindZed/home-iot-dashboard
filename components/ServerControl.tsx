@@ -1,26 +1,41 @@
 // components/ServerControl.tsx
-// Home Server Wake-on-LAN control card with live ping feedback and dark obsidian styling.
+// Infrastructure Wake-on-LAN control card with live ping feedback and dark obsidian styling.
+// Supports Home Server and Office Laptop.
 
 "use client";
 
 import { motion } from "framer-motion";
-import { Server, Zap, Terminal, Activity, ShieldCheck, Loader2 } from "lucide-react";
+import { Server, Laptop, Zap, Terminal, Activity, ShieldCheck, Loader2 } from "lucide-react";
 import { ServerData } from "@/hooks/useIoTData";
 
 interface ServerControlProps {
+  title?: string;
+  ip?: string;
+  portLabel?: string;
+  mac?: string;
+  deviceType?: "server" | "laptop";
   server: ServerData;
   onWake: () => void;
 }
 
-export default function ServerControl({ server, onWake }: ServerControlProps) {
+export default function ServerControl({
+  title = "Home Server",
+  ip = "192.168.0.107",
+  portLabel = "SSH :22",
+  mac = "70:71:BC:77:51:A3",
+  deviceType = "server",
+  server,
+  onWake,
+}: ServerControlProps) {
   const isOnline = server?.online;
   const isChecking = server?.checking;
   const isFailed = server?.failed;
+  const isLaptop = deviceType === "laptop";
 
   return (
     <motion.section
       className="relative overflow-hidden rounded-3xl bg-[#121722] border border-white/10 p-5 shadow-xl transition-colors duration-300 text-white select-none"
-      aria-label="Home Server Control"
+      aria-label={`${title} Control`}
     >
       {/* Background ambient glow when online */}
       {isOnline && (
@@ -41,14 +56,14 @@ export default function ServerControl({ server, onWake }: ServerControlProps) {
                 : "bg-[#1A2130] text-neutral-400 border border-white/[0.06]"
             }`}
           >
-            <Server className="w-5 h-5" />
+            {isLaptop ? <Laptop className="w-5 h-5" /> : <Server className="w-5 h-5" />}
           </div>
           <div>
             <h2 className="text-base font-bold text-white tracking-tight">
-              Home Server
+              {title}
             </h2>
             <p className="text-xs text-neutral-400 font-mono">
-              192.168.0.107 • SSH :22
+              {ip} • {portLabel}
             </p>
           </div>
         </div>
@@ -89,7 +104,7 @@ export default function ServerControl({ server, onWake }: ServerControlProps) {
             <Terminal className="w-3 h-3 text-orange-400" /> MAC Address
           </div>
           <p className="text-xs font-mono text-neutral-200 truncate">
-            00:11:32:B1:3D:16
+            {mac}
           </p>
         </div>
 
@@ -98,7 +113,11 @@ export default function ServerControl({ server, onWake }: ServerControlProps) {
             <Activity className="w-3 h-3 text-emerald-400" /> Health Ping
           </div>
           <p className="text-xs font-semibold text-neutral-200">
-            {isOnline ? "Responding (Port 22)" : isChecking ? "Probing server..." : "No response"}
+            {isOnline
+              ? `Responding (${portLabel})`
+              : isChecking
+              ? `Probing ${isLaptop ? "laptop" : "server"}...`
+              : "No response"}
           </p>
         </div>
       </div>
@@ -123,12 +142,12 @@ export default function ServerControl({ server, onWake }: ServerControlProps) {
         ) : isOnline ? (
           <>
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Server is Active & Ready</span>
+            <span>{isLaptop ? "Laptop is Active & Ready" : "Server is Active & Ready"}</span>
           </>
         ) : (
           <>
             <Zap className="w-4 h-4 fill-current" />
-            <span>Wake-on-LAN (Power On Server)</span>
+            <span>{isLaptop ? "Wake-on-LAN (Power On Laptop)" : "Wake-on-LAN (Power On Server)"}</span>
           </>
         )}
       </button>

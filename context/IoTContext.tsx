@@ -69,6 +69,7 @@ export interface IoTPayload {
   relays: RelayData;
   sys: SysData;
   server: ServerData;
+  laptop?: ServerData;
 }
 
 export interface LogEntry {
@@ -86,6 +87,7 @@ export interface IoTContextType {
   toggleRelay: (id: number) => void;
   pendingRelayIds: number[];
   wakeServer: () => void;
+  wakeLaptop: () => void;
   setRelayTimer: (id: number, seconds: number, action?: "off" | "on") => void;
 }
 
@@ -136,6 +138,11 @@ const initialMockData: IoTPayload = {
     checking: false,
     failed: false,
   },
+  laptop: {
+    online: false,
+    checking: false,
+    failed: false,
+  },
 };
 
 const MQTT_URL =
@@ -169,6 +176,9 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
 
   const handleNewData = useCallback((newData: IoTPayload) => {
     setIsConnecting(false);
+    if (!newData.laptop) {
+      newData.laptop = { online: false, checking: false, failed: false };
+    }
 
     // Guard optimistic toggle states: wait at least 1500ms for hardware ACK before allowing reversion
     const nowMs = Date.now();
@@ -203,6 +213,15 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
         newLogs.push({ time: now, message: "🟢 Home Server is now ONLINE", type: "info" });
       } else if (prevDataRef.current.server.online && !newData.server.online) {
         newLogs.push({ time: now, message: "💤 Home Server is OFFLINE", type: "info" });
+      }
+
+      // Check laptop state transitions
+      if (prevDataRef.current.laptop && newData.laptop) {
+        if (!prevDataRef.current.laptop.online && newData.laptop.online) {
+          newLogs.push({ time: now, message: "💻 Office Laptop is now ONLINE", type: "info" });
+        } else if (prevDataRef.current.laptop.online && !newData.laptop.online) {
+          newLogs.push({ time: now, message: "💤 Office Laptop is OFFLINE", type: "info" });
+        }
       }
 
       // Check motion transitions
@@ -470,15 +489,15 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
     }
   }, [handleNewData]);
 
-  // Sends Wake-on-LAN trigger command to ESP32: home/node1/wol/toggle
+  // Sends Wake-on-LAN trigger command to ESP32 for Home Server: home/node1/wol/toggle
   const wakeServer = useCallback(() => {
     if (clientRef.current && clientRef.current.connected) {
       const topic = "home/node1/wol/toggle";
-      clientRef.current.publish(topic, "{}", { qos: 1 }, (err) => {
+      clientRef.current.publish(topic, JSON.stringify({ target: "server" }), { qos: 1 }, (err) => {
         if (err) {
           console.error("[MQTT] Failed to trigger Wake-on-LAN:", err);
         } else {
-          console.log("[MQTT] Published WoL command to", topic);
+          console.log("[MQTT] Published Server WoL command to", topic);
         }
       });
       setData((prev) => {
@@ -495,6 +514,36 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
         return {
           ...prev,
           server: { ...prev.server, checking: true, failed: false },
+        };
+      });
+    }
+  }, []);
+
+  // Sends Wake-on-LAN trigger command to ESP32 for Office Laptop: home/node1/wol/toggle
+  const wakeLaptop = useCallback(() => {
+    if (clientRef.current && clientRef.current.connected) {
+      const topic = "home/node1/wol/toggle";
+      clientRef.current.publish(topic, JSON.stringify({ target: "laptop" }), { qos: 1 }, (err) => {
+        if (err) {
+          console.error("[MQTT] Failed to trigger Laptop Wake-on-LAN:", err);
+        } else {
+          console.log("[MQTT] Published Laptop WoL command to", topic);
+        }
+      });
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          laptop: { ...(prev.laptop || { online: false, failed: false }), checking: true, failed: false },
+        };
+      });
+    } else {
+      console.warn("[MQTT] Not connected — mocking Laptop Wake-on-LAN");
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          laptop: { ...(prev.laptop || { online: false, failed: false }), checking: true, failed: false },
         };
       });
     }
@@ -552,6 +601,7 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
     toggleRelay,
     pendingRelayIds,
     wakeServer,
+    wakeLaptop,
     setRelayTimer,
   };
 

@@ -22,7 +22,7 @@ This document contains the architecture, tech stack, and structure for the `home
 - **Optimistic UI Execution & Fast ACKs**: Switch clicks trigger instant 0ms optimistic visual response on the client with dual-transient audio clicks. The dashboard subscribes directly to `home/node1/relay/+/ack`, updating real-time hardware confirmation and clearing pending state in `<30ms`. In-flight telemetry is prevented from reverting the optimistic toggle for at least 1500ms before falling back if hardware confirmation is absent.
 - Controls relays with sub-40ms latency by publishing directly to `home/node1/relay/{id}/toggle`.
 - On-device Two-Way Edge Timers: Publishes to `home/node1/relay/{id}/timer` (`{"seconds": 300, "action": "off"}` or `{"seconds": 600, "action": "on"}`); ESP32 manages hardware countdown up to 24h on edge.
-- Sends Wake-on-LAN packets on demand by publishing to `home/node1/wol/toggle` with live server status feedback.
+- Sends Wake-on-LAN packets on demand by publishing to `home/node1/wol/toggle` (`{"target":"server"|"laptop"|"all"}`) with live server (Port 22 SSH) and laptop (Port 445 SMB) status feedback.
 - 1-Tap Master Scenes ("Leave Home / All Off", "Work Mode", "Night Mode", "All On").
 - Power Quality Monitoring: Displays real-time Power Factor (PF) load classification and Apparent Power (VA).
 
@@ -40,7 +40,7 @@ This document contains the architecture, tech stack, and structure for the `home
 - `/`: Main dashboard with greeting, quick 3-metric pill, 1-tap scenes, 2x2 device grid, and section shortcuts.
 - `/climate`: Dedicated climate & environment page recreating Screen 2 of the reference design with the radial gauge dial and comfort analytics.
 - `/energy`: Dedicated power monitoring page with real-time active watts, apparent power (VA), power factor quality badge, and circuit load states.
-- `/server`: Dedicated infrastructure page with Wake-on-LAN control, SSH port 22 health ping, ESP32 CPU/RAM diagnostics, and live event console.
+- `/server`: Dedicated infrastructure page with dual Wake-on-LAN controls (Home Server and Office Laptop), port health pings, ESP32 CPU/RAM diagnostics, and live event console.
 - `/settings`: User credentials, MQTT broker configuration, and offline PWA settings.
 
 ## Directory Structure
