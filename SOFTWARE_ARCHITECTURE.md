@@ -72,3 +72,10 @@ This document describes the unified software architecture, networking, state man
 
 ## 4. Hardware Power Supply Notice & Fallback
 The 4-channel relay board is currently under-powered by the power supply. The frontend UI implements optimistic toggle execution with graceful timeouts, allowing the user to operate the UI cleanly without getting blocked if physical current sensing requires extra settling time.
+
+---
+
+## 5. Zero-Database Serverless Frontend
+PostgreSQL and Prisma have been completely eliminated from the Next.js dashboard.
+* **Authentication**: Edge-compatible single-user authentication (`Mindzed` / `sewen@123`) using signed `jose` JWTs in HTTP-only cookies. Configurable via `AUTH_USERNAME` and `AUTH_PASSWORD` environment variables.
+* **Data Storage**: The frontend is 100% database-free on Vercel. All historical telemetry, power rollups, and sensor metrics are persisted and served by the Dokploy Go backend with embedded SQLite WAL storage.
