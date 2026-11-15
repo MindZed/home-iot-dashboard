@@ -1,64 +1,74 @@
-# Home IoT Dashboard - Software Architecture
+# Software Architecture - Home IoT Frontend & Go Backend
 
-## Overview
-This document contains the architecture, tech stack, and structure for the `home-iot-dashboard` project. 
-**Agent Instruction:** This file must be updated whenever any modifications are made to the database schema, core frontend structure, dependencies, or routing configurations to ensure the documentation stays perfectly in sync with the code.
+This document describes the unified software architecture, networking, state management, and UI design system for the `home-iot-unified` system.
 
-## Tech Stack
-- **Framework**: Next.js (App Router, v16)
-- **UI & Styling**: React (v19), Tailwind CSS (v4), Framer Motion (for animations)
-- **IoT Transport**: MQTT over WebSockets (WSS on Port 8084) via `mqtt` package
-- **Database & ORM**: PostgreSQL (Neon Serverless), Prisma (v7)
-- **Authentication**: `jose` (JWT), `bcryptjs` (hashing)
-- **Other Features**: PWA enabled via `@ducanh2912/next-pwa`
+---
 
-## Real-Time MQTT Architecture
-- **Global Singleton Provider (`IoTProvider`)**: Wrapped at the application root level in `app/layout.tsx`. Maintains a single persistent WSS MQTT connection across the entire application lifecycle.
-- **Persistent Telemetry Cache**: Page transitions between `/`, `/climate`, `/energy`, `/server`, and `/settings` are pure client-side transitions that share the same global context. No socket disconnects, loading screen flashes, or telemetry refetch delays occur on navigation.
-- **Hook Bridge (`useIoTData`)**: Delegated directly to `useIoTContext()`, preserving 100% backward compatibility with all existing components and pages.
-- Direct browser connection to MindZed Dedicated Broker (`wss://mqtt-ws.mindzed.tech`).
-- Completely decouples the dashboard from the local home server and Cloudflare tunnel (100% Vercel compatible).
-- Subscribes to `home/node1/telemetry`, `home/node1/status`, `home/node1/heartbeat`, `home/node1/relay/+/timer_ack`, `home/node1/wol/ack`.
-- **Optimistic UI Execution & Fast ACKs**: Switch clicks trigger instant 0ms optimistic visual response on the client with dual-transient audio clicks. The dashboard subscribes directly to `home/node1/relay/+/ack`, updating real-time hardware confirmation and clearing pending state in `<30ms`. In-flight telemetry is prevented from reverting the optimistic toggle for at least 1500ms before falling back if hardware confirmation is absent.
-- Controls relays with sub-40ms latency by publishing directly to `home/node1/relay/{id}/toggle`.
-- On-device Two-Way Edge Timers: Publishes to `home/node1/relay/{id}/timer` (`{"seconds": 300, "action": "off"}` or `{"seconds": 600, "action": "on"}`); ESP32 manages hardware countdown up to 24h on edge.
-- Sends Wake-on-LAN packets on demand by publishing to `home/node1/wol/toggle` (`{"target":"server"|"laptop"|"all"}`) with live server (Port 22 SSH) and laptop (Port 445 SMB) status feedback.
-- 1-Tap Master Scenes ("Leave Home / All Off", "Work Mode", "Night Mode", "All On").
-- Power Quality Monitoring: Displays real-time Power Factor (PF) load classification and Apparent Power (VA).
+## 1. High-Level Architecture & Data Flow
 
-## UI/UX Architecture & Mobile PWA Design
-- Dark obsidian theme (`#0B0E14`) inspired by modern smart home interfaces (@uix.vikram).
-- **FeedbackEngine (`lib/feedback.ts`, `hooks/useFeedback.ts`)**: Pure Web Audio API synthesized mechanical relay switch click sounds, rotary dial micro-ticks, and 1-tap scene harmonic chimes with `navigator.vibrate` micro-haptics. Zero external sound files. Includes persistent user toggle (`FeedbackToggle`).
-- **MoldComfortCard (`components/MoldComfortCard.tsx`, `lib/climateCalculations.ts`)**: Evaluates real-time perceived temperature ("Feels Like" Heat Index via NOAA Steadman formula), Dew Point condensation margin, and ASHRAE 160 indoor mold spore germination risk (0-100%) with actionable fan ventilation triggers.
-- **LoadingScreen**: Animated concentric pulsing hub showing live WSS handshake until ESP32 telemetry syncs.
-- **DeviceCard**: 2x2 grid layout with sunset-orange gradient active glow (`from-amber-500 via-orange-600 to-rose-600`), CT-driven states, tactile sound feedback, and Lucide vector icons.
-- **TimerModal**: 360° interactive rotary dial supporting two-way auto-off / auto-on timers up to 24 hours with dial tick sound feedback.
-- **ClimateDial**: Radial temperature gauge with circular ticks, ambient needle, humidity, pressure, and air quality bar.
-- **BottomNav**: Subtle, textless, floating glassmorphic pill bar (`backdrop-blur-2xl`) with Lucide vector icons (`Home`, `Climate`, `Energy`, `Server`, `Settings`).
+```
+[ ESP32 Hardware Node (Node 1) ]
+       │  (MQTTS - TLS v1.3 on Port 8883)
+       ▼
+[ MindZed MQTT Broker (mqtt.mindzed.tech) ]
+       │
+       │  (Internal MQTT Client: paho.mqtt.golang)
+       ▼
+[ Dokploy Go Backend (home-iot.mindzed.tech:8080) ]
+       ├── Ingestion Worker ──> [ SQLite WAL Database (/data/iot.db) ]
+       │                            ├── telemetry_raw (10-15s resolution)
+       │                            ├── power_hourly (Hourly kWh & peak metrics)
+       │                            └── power_daily (Daily summaries)
+       ├── Retention Engine (Monthly block pruning: retains 2 full calendar months)
+       └── WebSocket Hub (/ws)
+               ▲
+               │  (WSS Encrypted WebSocket + HTTPS REST)
+               ▼
+[ Next.js 16 PWA Dashboard (sewen.me) ]
+       ├── Single Global IoTProvider (app/layout.tsx)
+       ├── Sub-15ms Bidirectional Control
+       └── Black / White / Soft Red Stealth Design System
+```
 
-## Page Routing Structure
-- `/`: Main dashboard with greeting, quick 3-metric pill, 1-tap scenes, 2x2 device grid, and section shortcuts.
-- `/climate`: Dedicated climate & environment page recreating Screen 2 of the reference design with the radial gauge dial and comfort analytics.
-- `/energy`: Dedicated power monitoring page with real-time active watts, apparent power (VA), power factor quality badge, and circuit load states.
-- `/server`: Dedicated infrastructure page with dual Wake-on-LAN controls (Home Server and Office Laptop), port health pings, ESP32 CPU/RAM diagnostics, and live event console.
-- `/settings`: User credentials, MQTT broker configuration, and offline PWA settings.
+---
 
-## Directory Structure
-- `app/`: Next.js App Router endpoints and pages (`page.tsx`, `climate/`, `energy/`, `server/`, `settings/`, `login/`).
-- `components/`: Reusable React UI components (`DeviceCard`, `ClimateDial`, `TimerModal`, `LoadingScreen`, `ServerControl`, `QuickScenes`, `SystemHealth`, `EventLog`, `BottomNav`).
-- `context/`: React context providers for state management.
-- `hooks/`: Custom React hooks.
-- `lib/`: Utility functions and shared core logic.
-- `prisma/`: Database schema (`schema.prisma`) and migrations.
+## 2. Go Backend & Database Engine (`backend/`)
 
-## Database Models (Prisma)
-### `User`
-- `id`: String (cuid) - Primary Key
-- `username`: String (unique)
-- `passwordHash`: String
-- `createdAt`: DateTime
-- `updatedAt`: DateTime
+* **Runtime:** Go 1.23 statically linked Alpine container (~22 MB).
+* **Database:** Embedded SQLite in WAL mode (`modernc.org/sqlite` pure Go).
+* **Retention Policy:**
+  - **Raw Telemetry (`telemetry_raw`)**: Monthly block pruning: retains current month and 2 preceding calendar months intact (e.g. data from Nov 16 is retained until Jan 31; on Feb 1, the entire Nov month block is purged in a single batch via `DELETE FROM telemetry_raw WHERE timestamp < datetime('now', 'start of month', '-2 month')`).
+  - **Hourly Power Rollup (`power_hourly`)**: Retained permanently for multi-year energy consumption analytics.
+* **WebSocket Server (`/ws`)**:
+  - Broadcasts live telemetry frames to all connected browsers (`telemetry`).
+  - Dispatches optimistic relay commands (`toggle_relay`, `set_timer`).
+  - Sends Wake-on-LAN commands (`wol`).
+* **REST API Endpoints**:
+  - `GET /api/v1/health`: Container & DB healthcheck.
+  - `GET /api/v1/telemetry/latest`: Latest snapshot.
+  - `GET /api/v1/analytics/power?range=24h|7d|30d`: Time-series power charts.
+  - `GET /api/v1/analytics/climate?range=24h|7d|30d`: Time-series climate trends.
+  - `GET /api/v1/analytics/summary`: Today's kWh, yesterday's kWh, peak power.
+  - `POST /api/v1/relay/{id}/toggle`: REST alternative for relay toggling.
+  - `POST /api/v1/wol`: REST alternative for Wake-on-LAN.
 
-## Running the Application
-- **Development**: `npm run dev` (Runs on `0.0.0.0` to allow local network access)
-- **Database Generation**: `npx prisma generate` (or runs automatically on postinstall)
+---
+
+## 3. UI/UX Design System: Black, White & Soft Red
+
+* **Background:** Pitch obsidian black (`#050608` / `#000000`).
+* **Surfaces & Cards:** Deep glassmorphic obsidian (`#0D1017`) with subtle border highlights (`border-white/10`).
+* **Primary Typography:** Crisp high-contrast white (`text-white`).
+* **Accent Palette:**
+  - Soft Red: `#EF4444` (`text-red-400`, `bg-red-500/15`, `border-red-500/30`)
+  - Rose Crimson: `#F43F5E` (`from-red-600 via-rose-600 to-red-500`)
+  - Active Glow: `rgba(239, 68, 68, 0.2)`
+* **Active States:**
+  - Active Relay Switch: Soft red gradient glow (`bg-gradient-to-br from-red-600 via-rose-600 to-red-500`).
+  - Active Navigation Tab: Glowing crimson glass pill with soft-red active dot.
+  - Live Sensors: Soft red accents for active power and feels-like temperature.
+
+---
+
+## 4. Hardware Power Supply Notice & Fallback
+The 4-channel relay board is currently under-powered by the power supply. The frontend UI implements optimistic toggle execution with graceful timeouts, allowing the user to operate the UI cleanly without getting blocked if physical current sensing requires extra settling time.
