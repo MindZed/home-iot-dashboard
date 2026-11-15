@@ -14,7 +14,7 @@ import BottomNav from "@/components/BottomNav";
 import LoadingScreen from "@/components/LoadingScreen";
 
 export default function ServerPage() {
-  const { data, isConnecting, logs, clearLogs, wakeServer, wakeLaptop, checkLaptop } = useIoTData();
+  const { data, isConnecting, logs, clearLogs, wakeServer, wakeLaptop } = useIoTData();
 
   if (isConnecting && !data) {
     return <LoadingScreen statusText="Probing Infrastructure & ESP32 Node..." />;
@@ -75,7 +75,6 @@ export default function ServerPage() {
               deviceType="laptop"
               server={data.laptop || { online: false, checking: false, failed: false }}
               onWake={wakeLaptop}
-              onCheck={checkLaptop}
             />
           </section>
 
