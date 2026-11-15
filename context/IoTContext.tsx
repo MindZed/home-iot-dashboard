@@ -88,6 +88,7 @@ export interface IoTContextType {
   pendingRelayIds: number[];
   wakeServer: () => void;
   wakeLaptop: () => void;
+  checkLaptop: () => void;
   setRelayTimer: (id: number, seconds: number, action?: "off" | "on") => void;
 }
 
@@ -334,6 +335,11 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
               checking: Boolean(json.server?.checking),
               failed: Boolean(json.server?.failed),
             },
+            laptop: {
+              online: Boolean(json.laptop?.online),
+              checking: Boolean(json.laptop?.checking),
+              failed: Boolean(json.laptop?.failed),
+            },
           };
 
           handleNewData(transformed);
@@ -378,8 +384,9 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
           ]);
         } else if (topic === TOPIC_WOL_ACK) {
           const now = new Date().toLocaleTimeString([], { hour12: false });
+          const targetName = json.target === "laptop" ? "Office Laptop" : "Home Server";
           setLogs((prev) => [
-            { time: now, message: "🚀 Magic Packet sent! Waking server...", type: "info" },
+            { time: now, message: `🚀 Magic Packet sent! Waking ${targetName}...`, type: "info" },
             ...prev.slice(0, 14),
           ]);
         } else if (topic === TOPIC_STATUS) {
@@ -549,6 +556,36 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Sends on-demand probe command to ESP32 for Office Laptop: home/node1/wol/laptop/check
+  const checkLaptop = useCallback(() => {
+    if (clientRef.current && clientRef.current.connected) {
+      const topic = "home/node1/wol/laptop/check";
+      clientRef.current.publish(topic, JSON.stringify({ action: "check" }), { qos: 1 }, (err) => {
+        if (err) {
+          console.error("[MQTT] Failed to send laptop check command:", err);
+        } else {
+          console.log("[MQTT] Published laptop check command to", topic);
+        }
+      });
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          laptop: { ...(prev.laptop || { online: false, failed: false }), checking: true, failed: false },
+        };
+      });
+    } else {
+      console.warn("[MQTT] Not connected — mocking Laptop check");
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          laptop: { ...(prev.laptop || { online: false, failed: false }), checking: true, failed: false },
+        };
+      });
+    }
+  }, []);
+
   // Sends on-device two-way timer command to ESP32: home/node1/relay/{id}/timer
   const setRelayTimer = useCallback((id: number, seconds: number, action: "off" | "on" = "off") => {
     if (clientRef.current && clientRef.current.connected) {
@@ -602,6 +639,7 @@ export function IoTProvider({ children }: { children: React.ReactNode }) {
     pendingRelayIds,
     wakeServer,
     wakeLaptop,
+    checkLaptop,
     setRelayTimer,
   };
 

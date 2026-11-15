@@ -23,6 +23,7 @@ This document contains the architecture, tech stack, and structure for the `home
 - Controls relays with sub-40ms latency by publishing directly to `home/node1/relay/{id}/toggle`.
 - On-device Two-Way Edge Timers: Publishes to `home/node1/relay/{id}/timer` (`{"seconds": 300, "action": "off"}` or `{"seconds": 600, "action": "on"}`); ESP32 manages hardware countdown up to 24h on edge.
 - Sends Wake-on-LAN packets on demand by publishing to `home/node1/wol/toggle` (`{"target":"server"|"laptop"|"all"}`) with live server (Port 22 SSH) and laptop (Port 445 SMB) status feedback.
+- **Sleep-Safe WoL & On-Demand Probe**: Sends on-demand laptop status probe commands via `home/node1/wol/laptop/check` (`checkLaptop()`), triggering a 15-second probe window on the ESP32 while keeping the laptop fully sleep-safe (zero unsolicited TCP packets while asleep).
 - 1-Tap Master Scenes ("Leave Home / All Off", "Work Mode", "Night Mode", "All On").
 - Power Quality Monitoring: Displays real-time Power Factor (PF) load classification and Apparent Power (VA).
 

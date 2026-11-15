@@ -5,7 +5,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Server, Laptop, Zap, Terminal, Activity, ShieldCheck, Loader2 } from "lucide-react";
+import { Server, Laptop, Zap, Terminal, Activity, ShieldCheck, Loader2, RefreshCw } from "lucide-react";
 import { ServerData } from "@/hooks/useIoTData";
 
 interface ServerControlProps {
@@ -16,6 +16,7 @@ interface ServerControlProps {
   deviceType?: "server" | "laptop";
   server: ServerData;
   onWake: () => void;
+  onCheck?: () => void;
 }
 
 export default function ServerControl({
@@ -26,6 +27,7 @@ export default function ServerControl({
   deviceType = "server",
   server,
   onWake,
+  onCheck,
 }: ServerControlProps) {
   const isOnline = server?.online;
   const isChecking = server?.checking;
@@ -122,35 +124,49 @@ export default function ServerControl({
         </div>
       </div>
 
-      {/* Wake-on-LAN Trigger Button */}
-      <button
-        onClick={onWake}
-        disabled={isChecking}
-        className={`w-full py-3 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all duration-300 shadow-md ${
-          isOnline
-            ? "bg-[#1A2130] text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/10 cursor-default"
-            : isChecking
-            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 cursor-wait animate-pulse"
-            : "bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 text-white hover:brightness-110 active:scale-[0.98] shadow-orange-500/25"
-        }`}
-      >
-        {isChecking ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Sending Magic Packet & Probing...</span>
-          </>
-        ) : isOnline ? (
-          <>
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>{isLaptop ? "Laptop is Active & Ready" : "Server is Active & Ready"}</span>
-          </>
-        ) : (
-          <>
-            <Zap className="w-4 h-4 fill-current" />
-            <span>{isLaptop ? "Wake-on-LAN (Power On Laptop)" : "Wake-on-LAN (Power On Server)"}</span>
-          </>
+      {/* Action Buttons: Wake-on-LAN Trigger + Optional On-Demand Probe */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onWake}
+          disabled={isChecking}
+          className={`flex-1 py-3 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all duration-300 shadow-md ${
+            isOnline
+              ? "bg-[#1A2130] text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/10 cursor-default"
+              : isChecking
+              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 cursor-wait animate-pulse"
+              : "bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 text-white hover:brightness-110 active:scale-[0.98] shadow-orange-500/25"
+          }`}
+        >
+          {isChecking ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Sending Magic Packet & Probing...</span>
+            </>
+          ) : isOnline ? (
+            <>
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>{isLaptop ? "Laptop is Active & Ready" : "Server is Active & Ready"}</span>
+            </>
+          ) : (
+            <>
+              <Zap className="w-4 h-4 fill-current" />
+              <span>{isLaptop ? "Wake-on-LAN (Power On Laptop)" : "Wake-on-LAN (Power On Server)"}</span>
+            </>
+          )}
+        </button>
+
+        {onCheck && (
+          <button
+            onClick={onCheck}
+            disabled={isChecking}
+            title={`Check ${isLaptop ? "Laptop" : "Server"} Status`}
+            aria-label={`Check ${isLaptop ? "Laptop" : "Server"} Status`}
+            className="h-[42px] px-3.5 rounded-2xl bg-[#171E2C] border border-white/10 hover:bg-[#1E273A] hover:border-white/20 text-neutral-300 hover:text-white transition-all disabled:opacity-50 flex items-center justify-center shadow-md active:scale-95"
+          >
+            <RefreshCw className={`w-4 h-4 ${isChecking ? "animate-spin text-amber-400" : ""}`} />
+          </button>
         )}
-      </button>
+      </div>
     </motion.section>
   );
 }
